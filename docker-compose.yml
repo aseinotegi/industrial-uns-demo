@@ -1,0 +1,96 @@
+# The story of andersein.com, running: robot photo → vision → UNS ← PLC → rules → robot → dashboard.
+#
+#   docker compose up --build        then open http://localhost:3000 (Grafana)
+#   docker compose run --rm tree     the whole namespace, right now
+
+x-service: &service
+  build: .
+  image: industrial-uns-demo:local
+  restart: unless-stopped
+  depends_on: [broker]
+  environment:
+    MQTT_HOST: broker
+    WORLD_URL: http://world:8080
+    # Speed the story up for a quick look: WORLD_TIME_SCALE=0.25 docker compose up
+    WORLD_TIME_SCALE: ${WORLD_TIME_SCALE:-1}
+    ROBOT_ROUND_S: ${ROBOT_ROUND_S:-15}
+    ROBOT_TRAVEL_S: ${ROBOT_TRAVEL_S:-10}
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    ports: ["1883:1883"]
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  # The physical plant: PT-104 wired to a Siemens S7 PLC, local gauge PI-104, manual valve XV-104.
+  world:
+    <<: *service
+    command: ["uns-world"]
+
+  # Reads the PLC and publishes PT-104 straight into its UNS path.
+  plc-gateway:
+    build: https://github.com/aseinotegi/plc-mqtt-gateway.git#main
+    image: plc-gateway:uns-demo
+    restart: unless-stopped
+    depends_on: [broker, world]
+    environment:
+      PLC_HOST: world
+      PLC_PORT: "1102"
+      MQTT_HOST: broker
+    volumes:
+      - ./config/plc-gateway.yaml:/config/config.yaml:ro
+
+  robot:
+    <<: *service
+    command: ["uns-robot"]
+    depends_on: [broker, world]
+
+  vision:
+    <<: *service
+    command: ["uns-vision"]
+    depends_on: [broker, world]
+
+  rules:
+    <<: *service
+    command: ["uns-rules"]
+    environment:
+      MQTT_HOST: broker
+      RULES_FILE: /app/config/rules.yaml
+    volumes:
+      - ./config/rules.yaml:/app/config/rules.yaml:ro
+
+  historian:
+    <<: *service
+    command: ["uns-historian"]
+    depends_on: [broker, timescaledb]
+    environment:
+      MQTT_HOST: broker
+      DATABASE_URL: postgresql://uns:uns@timescaledb:5432/uns
+
+  timescaledb:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_USER: uns
+      POSTGRES_PASSWORD: uns
+      POSTGRES_DB: uns
+    ports: ["5432:5432"]
+
+  grafana:
+    image: grafana/grafana-oss:11.3.0
+    depends_on: [timescaledb]
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/linea-104.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  # On demand: docker compose run --rm tree
+  tree:
+    <<: *service
+    command: ["uns-tree"]
+    restart: "no"
+    profiles: [tools]

@@ -1,0 +1,17 @@
+# Rules evaluated on every live value of the UNS.
+#
+#   mode        notify: raise the alarm only · act: also send the orders in on_trigger
+#   when        all conditions must hold, each value no older than max_age_s
+#   clear_when  any condition clears the alarm (hysteresis: clears below 5.5, not 6.0)
+
+rules:
+  - id: sobrepresion-linea-104
+    description: Sobrepresión en la línea 104 confirmada por visión y PLC
+    mode: act
+    when:
+      - { topic: planta1/exterior/pi-104/presion, above: 6.0, max_age_s: 45, quality: good }
+      - { topic: planta1/exterior/pt-104/presion, above: 6.0, max_age_s: 30 }
+    clear_when:
+      - { topic: planta1/exterior/pt-104/presion, below: 5.5 }
+    on_trigger:
+      - { topic: planta1/exterior/xv-104/orden, value: cerrar }

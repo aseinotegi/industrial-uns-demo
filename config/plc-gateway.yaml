@@ -1,0 +1,26 @@
+# plc-mqtt-gateway (github.com/aseinotegi/plc-mqtt-gateway) reading the plant's PLC.
+# Each tag has its own UNS path, so the PLC value lands next to the vision reading.
+# PLC_HOST, PLC_PORT and MQTT_HOST come from docker-compose.yml.
+
+plc:
+  host: world
+  rack: 0
+  slot: 1
+  port: 1102
+
+mqtt:
+  client_id: plc-gateway-planta1
+  base_topic: planta1/servicios/plc-gateway   # its own status and stats, next to the other services
+  qos: 1
+  retain: true
+
+gateway:
+  poll_interval_ms: 200
+  heartbeat_s: 10          # the rules want PLC values younger than 30 s
+  reconnect_max_s: 15
+
+tags:
+  - { name: pt_104_presion,     address: DB1.DBD0,   type: REAL, unit: bar, deadband: 0.02,
+      topic: planta1/exterior/pt-104/presion }
+  - { name: pt_104_alarma_alta, address: DB1.DBX4.0, type: BOOL,
+      topic: planta1/exterior/pt-104/alarma-alta }

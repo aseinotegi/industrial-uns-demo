@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "industrial-uns-demo"
+version = "1.0.0"
+description = "Unified Namespace for a plant: robot vision and PLC data in one hierarchy, cross-checked by rules"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ander Sein Otegui", email = "aseinotegi@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "paho-mqtt>=2.0",
+    "PyYAML>=6.0",
+    "python-snap7>=2.0",
+    "psycopg[binary]>=3.1",
+]
+keywords = ["uns", "unified-namespace", "mqtt", "iiot", "plc", "timescaledb", "industrial"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+uns-world = "uns_demo.world:main"
+uns-vision = "uns_demo.vision:main"
+uns-robot = "uns_demo.robot:main"
+uns-rules = "uns_demo.rules:main"
+uns-historian = "uns_demo.historian:main"
+uns-tree = "uns_demo.tree:main"
+
+[project.urls]
+Homepage = "https://andersein.com"
+Source = "https://github.com/aseinotegi/industrial-uns-demo"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
