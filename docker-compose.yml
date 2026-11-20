@@ -129,6 +129,7 @@ services:
       MQTT_PASSWORD: demo-inspector
       POI_PROVIDER_URL: ${POI_PROVIDER_URL:-}
       POI_PROVIDER_MODEL: ${POI_PROVIDER_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}  # only for inspector.gemini.yaml; from .env
       # A photo older than this (queue included) is discarded as stale. Raise it for a
       # slow model on CPU, or PI-104 readings arrive too late to count.
       MAX_PHOTO_AGE_S: ${MAX_PHOTO_AGE_S:-45}

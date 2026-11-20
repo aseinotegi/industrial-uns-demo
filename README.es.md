@@ -85,11 +85,14 @@ El robot (`robot-01`) acelera y frena, va más despacio en las curvas, gasta bat
 |---|---|---|
 | `config/inspector.yaml` (por defecto) | ninguno: respuestas grabadas ([respuestas-de-prueba.json](dataset/respuestas-de-prueba.json)), escritas desde los valores reales. Cada resultado dice `model: replay` | CI y un primer arranque sin instalar nada |
 | `config/inspector.ollama.yaml` | `qwen3-vl` en [Ollama](https://ollama.com) en tu PC (usa su GPU) | lo de verdad, nada sale de la máquina |
+| `config/inspector.gemini.yaml` | Gemini Flash, en la nube, con una clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey) | un modelo real en un PC sin GPU. En el plan gratuito Google puede usar las fotos para mejorar sus productos |
 
 ```bash
 ollama pull qwen3-vl
 INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_DWELL_S=15 docker compose up --build
 ```
+
+Para Gemini, copia [.env.example](.env.example) a `.env`, pega la clave en `GEMINI_API_KEY` y lanza `docker compose up --build`: compose lee `.env` por su cuenta y git lo ignora.
 
 ## El namespace
 

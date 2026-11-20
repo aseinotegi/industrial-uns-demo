@@ -63,8 +63,9 @@ def to_row(topic: str, message: Message) -> tuple[str, tuple]:
     time = uns.parse_ts(message.ts)
     number = message.number
     # An inspection is a record (photo, checks, model), not a sample: it goes to events
-    # even when it read a number, so the whole of it is kept.
-    if number is not None and not topic.endswith("/inspeccion"):
+    # even when it read a number, so the whole of it is kept. A vision trial too.
+    record = topic.endswith("/inspeccion") or topic.startswith(f"{uns.VISION_TRIAL}/")
+    if number is not None and not record:
         return "measurements", (time, topic, number, message.unit, message.source, message.quality)
     payload = json.loads(message.to_json())
     return "events", (time, topic, str(message.value), json.dumps(payload, ensure_ascii=False))

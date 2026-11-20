@@ -1,0 +1,95 @@
+# poi-vision-inspector (github.com/aseinotegi/poi-vision-inspector) reading the robot's photos
+# with Gemini, in the cloud: nothing to install on the PC. A free key from Google AI Studio
+# (https://aistudio.google.com/apikey) goes in .env, never in this file:
+#   GEMINI_API_KEY=...
+#   INSPECTOR_CONFIG=inspector.gemini.yaml
+# then docker compose up --build. POI_PROVIDER_MODEL overrides the model.
+# Free tier: prompts and photos may be used by Google to improve its products.
+
+provider:
+  kind: gemini
+  # Flash-Lite: answers in seconds on the free tier. The newest Flash models took minutes
+  # or were overloaded (503); the "-latest" aliases do not exist on the API the SDK uses.
+  model: gemini-3.5-flash-lite
+  api_key_env: GEMINI_API_KEY
+  timeout_s: 60
+  retries: 2
+
+profiles:
+  manometro:
+    kind: numeric
+    description: an analog pressure gauge (round dial with a needle and a printed scale)
+    instruction: |
+      You are an industrial inspector reading instruments from robot photos.
+      Find the pressure gauge in the photo and read where the needle tip points on the scale.
+      Read between the printed marks when the needle is between them, to one decimal.
+      Negative values are fine on vacuum/pressure gauges: read the sign from the scale.
+      If glare, blur, dirt, darkness or an obstacle hides the needle or the scale, do not guess.
+    reasons: [lectura_valida, no_legible, no_encontrado]
+    min_confidence: 0.8
+
+  # A gauge with two scales: pressure (upper half, bar) and temperature (lower half, °C)
+  termomanometro:
+    kind: numeric
+    description: a thermomanometer, one dial with a pressure scale in bar on top and a temperature scale in °C below
+    instruction: |
+      You are an industrial inspector reading instruments from robot photos.
+      Read only the PRESSURE: the needle that points to the upper scale marked in bar.
+      Ignore the temperature needle and the °C scale. Read to one decimal.
+      If you cannot tell which needle is the pressure one, or it cannot be read, do not guess.
+    reasons: [lectura_valida, no_legible, no_encontrado]
+    min_confidence: 0.8
+
+  extintor:
+    kind: state
+    description: a portable fire extinguisher, normally hanging on its wall bracket
+    instruction: |
+      You are an industrial safety inspector checking fire extinguishers from robot photos.
+      OK only if the extinguisher hangs on its wall bracket (or sits in its holder) and looks complete.
+      NOK if it lies on the floor or stands off its bracket, if the bracket is empty, or if the
+      needle of its small pressure gauge is outside the green band.
+    values: [OK, NOK]
+    reasons: [correcto, fuera_de_soporte, ausente, presion_baja, no_legible]
+    min_confidence: 0.8
+
+# One entry per point of interest of the robot's round (config/planta.yaml).
+pois:
+  PI-104:
+    profile: manometro
+    tag: PI-104
+    uns_topic: planta1/exterior/pi-104/presion
+    expect: { unit: bar, min: 0, max: 10, max_step: 3 }
+
+  PI-610:
+    profile: manometro
+    tag: PI-610
+    uns_topic: planta1/auxiliares/pi-610/presion
+    expect: { unit: bar, min: 0, max: 25 }
+
+  PI-201:
+    profile: termomanometro
+    tag: PI-201
+    uns_topic: planta1/calderas/pi-201/presion
+    expect: { unit: bar, min: 0, max: 6 }
+
+  PIV-801:
+    profile: manometro
+    tag: PIV-801
+    uns_topic: planta1/subestacion/tr-1/presion
+    expect: { unit: kPa, min: -100, max: 100 }
+
+  PI-402:
+    profile: manometro
+    tag: PI-402
+    uns_topic: planta1/taller/pi-402/presion
+    expect: { unit: bar, min: 0, max: 16 }
+
+  EXT-12:
+    profile: extintor
+    tag: EXT-12
+    uns_topic: planta1/exterior/ext-12/estado
+
+  EXT-14:
+    profile: extintor
+    tag: EXT-14
+    uns_topic: planta1/control/ext-14/estado
