@@ -86,9 +86,14 @@ class Plant:
 
 
 def default_path() -> Path:
+    """PLANT_FILE, else config/planta.yaml from where the service runs (/app in the
+    image, the repository when developing), like the rules file."""
     if os.environ.get("PLANT_FILE"):
         return Path(os.environ["PLANT_FILE"])
-    return Path(__file__).resolve().parents[2] / "config" / "planta.yaml"
+    here = Path("config/planta.yaml")
+    if here.exists():
+        return here
+    return Path(__file__).resolve().parents[2] / "config" / "planta.yaml"  # tests from elsewhere
 
 
 def load_plant(path: Path | None = None) -> Plant:

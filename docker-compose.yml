@@ -15,6 +15,7 @@ x-service: &service
   environment:
     MQTT_HOST: broker
     WORLD_URL: http://world:8080
+    PLANT_FILE: /app/config/planta.yaml
     # Speed the story up for a quick look: see "Quick start" in the README
     WORLD_TIME_SCALE: ${WORLD_TIME_SCALE:-1}
     ROBOT_SPEED: ${ROBOT_SPEED:-1.5}      # m/s along the route of config/planta.yaml
