@@ -6,26 +6,25 @@
 
 **English** · [Español](README.es.md)
 
-A **Unified Namespace** for a small plant, running on your laptop with one command. A robot photographs a gauge and an extinguisher, a multimodal model reads the photos, a PLC transmitter publishes the same pressure, a rule cross-checks them, the robot closes a manual valve and everything ends up in a historian with a dashboard.
+A **Unified Namespace** for a small plant, running on your laptop with one command. An inspection robot walks the plant and photographs gauges and extinguishers, a multimodal model reads the photos, a Siemens S7 PLC publishes the process, a rule cross-checks vision and PLC, the robot closes a manual valve, and everything ends up in a historian. A web console shows it all live, and the network is segmented and locked down the way a plant should be.
 
 It is the story told on [andersein.com](https://andersein.com), working: no hardware, no cloud, real protocols.
 
+![The plant console: the robot on its way to close XV-104](https://raw.githubusercontent.com/aseinotegi/plant-console/main/docs/robot.png)
+
 ```mermaid
 flowchart LR
-    subgraph plant["Plant (simulated)"]
-        W["world<br/>pressure line · PT-104 · PI-104 · XV-104 · EXT-12<br/>(dataset: PLC profile + photos)"]
+    subgraph campo["network campo (the plant floor)"]
+        W["world<br/>line 104 · T-101 · P-104 · PLC S7<br/>camera and arm (simulated)"]
     end
-    R["robot<br/>rounds and missions"] -- "photos of PI-104, EXT-12" --> B
-    W -- "S7 · DB1" --> G["plc-gateway<br/>(plc-mqtt-gateway)"]
-    G -- "pt-104/presion" --> B
-    B[("UNS<br/>MQTT broker<br/>planta1/…")]
+    W -- "S7 · DB1" --> G["plc-gateway<br/>(read-only)"]
+    W -- "photos" --> R["robot<br/>rounds, missions,<br/>serves its photos"]
+    G --> B
+    R <--> B[("UNS<br/>Mosquitto<br/>users + ACL")]
     B -- photo --> V["inspector<br/>(poi-vision-inspector)"]
-    V -- "pi-104/presion · ext-12/estado" --> B
-    B --> RU["rules"]
-    RU -- "alarm · xv-104/orden" --> B
-    B -- order --> R
-    R -- "closes XV-104" --> W
-    B --> H["historian"] --> T[("TimescaleDB")] --> GR["Grafana"]
+    V -- readings --> B
+    B <--> RU["rules<br/>(whitelisted orders)"]
+    B --> H["historian"] --> T[("TimescaleDB")] --> GR["Grafana<br/>(read-only DB user)"]
     B <--> C["console<br/>(plant-console)"]
 ```
 
@@ -35,70 +34,50 @@ flowchart LR
 docker compose up --build
 ```
 
-Open **http://localhost:8000**, the plant console ([plant-console](https://github.com/aseinotegi/plant-console)): the robot walking its route on the plant map, the PLC, the namespace, the rules (editable) and what the vision read in each photo. Grafana, with the history, is on **http://localhost:3000** (no login).
+Open **http://localhost:8000**, the plant console ([plant-console](https://github.com/aseinotegi/plant-console)): the plant map with the robot walking its route, the PLC signals, the vision results with each photo, a rule builder, the namespace, a live MQTT view, the history (Grafana, embedded), the architecture and the security controls.
 
-Every three minutes the line pressure rises from 4.2 towards 6.8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). Within a minute you will see the alarm confirmed by both sources, the robot closing XV-104 and the pressure falling back.
+Every six minutes the pressure coming into line 104 rises from 4.2 towards 6.8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). On its next pass the robot photographs gauge PI-104, the vision reading and the PLC transmitter agree, the rule fires, the robot walks to XV-104, closes it and the pressure falls back.
 
-Too slow for a first look? `WORLD_TIME_SCALE=0.25 ROBOT_SPEED=6 ROBOT_DWELL_S=0.75 docker compose up --build` runs the whole story in under a minute. The **Provocar sobrepresión** button in the console starts a pressure surge right away instead of waiting for the next one.
+Too slow for a first look? Run everything four times faster:
 
-The namespace, right now:
-
-```text
-$ docker compose run --rm tree
-planta1/
-  exterior/
-    pi-104/
-      presion                 6.50 bar   (inspector, 94%)
-    pt-104/
-      alarma-alta             True
-      presion                 6.00 bar
-    reglas/
-      sobrepresion-linea-104  activa   (rules)
-    xv-104/
-      estado                  cerrada   (robot-01)
-  robots/
-    robot-01/
-      mision                  completada   (robot-01)
-  servicios/
-    historian                 online   (historian)
-    ...
+```bash
+WORLD_TIME_SCALE=0.25 ROBOT_SPEED=6 ROBOT_ACCEL=9.6 ROBOT_DWELL_S=0.75 ROBOT_ACTION_S=1 ROBOT_CHARGE_RATE=12 docker compose up --build
 ```
 
-And what the historian keeps, one alarm from start to end (real output of a run):
+The **Provocar sobrepresión** button in the console starts a pressure surge right away instead of waiting for the next one. To start over with the shipped rules: `docker compose down -v`.
+
+## The plant
+
+[config/planta.yaml](config/planta.yaml) is the map: buildings, walkways, pipes and equipment, in metres. The robot walks it and the console draws it, so what you see is where the robot is.
 
 ```text
-16:28:54.920 | planta1/robots/robot-01/foto                   | IMG_0413
-16:28:54.924 | planta1/exterior/reglas/sobrepresion-linea-104 | activa
-16:28:54.924 | planta1/exterior/xv-104/orden                  | cerrar
-16:28:54.926 | planta1/robots/robot-01/mision                 | en-camino
-16:28:57.428 | planta1/exterior/xv-104/estado                 | cerrada
-16:28:57.429 | planta1/robots/robot-01/mision                 | completada
-16:28:58.381 | planta1/exterior/reglas/sobrepresion-linea-104 | normal
+header ─▶ XV-104 ─▶ PI-104 · PT-104 · FT-104 · TT-104 ─▶ T-101 (LT-101) ─▶ P-104 ─▶ unit 2
 ```
 
-## The story, service by service
-
-| Step | Service | What it does |
+| Where | What | How it is read |
 |---|---|---|
-| 1 | `robot` | Every round it stops at local gauge **PI-104** (a dial with no signal) and extinguisher **EXT-12** and takes a photo of each |
-| 2 | `inspector` | [poi-vision-inspector](https://github.com/aseinotegi/poi-vision-inspector) reads each photo with a multimodal model: value, confidence and its own checks. Doubtful photos are published as `quality: uncertain`, unreadable ones never overwrite the last value |
-| 3 | `plc-gateway` | Reads transmitter **PT-104** from the Siemens S7 PLC and publishes it to its UNS path |
-| 4 | `rules` | Vision **and** PLC above 6 bar, both recent → alarm confirmed, order `cerrar` for XV-104 |
-| 5 | `robot` | Goes to manual valve **XV-104** (no actuator) and closes it. Reports the new position |
-| 6 | `historian` | Stores every value and event in TimescaleDB. Grafana shows the peak, the alarm and the closing |
+| Line 104 | manual valve **XV-104** (no actuator, no position switch) | the robot checks it and closes it |
+| Line 104 | gauge **PI-104** (a dial, no signal) | robot photo + vision |
+| Line 104 | pressure **PT-104**, flow **FT-104**, temperature **TT-104** | PLC (S7, DB1) |
+| Tank farm | tank **T-101**, level **LT-101**, pump **P-104** (run, motor current, starts) | PLC. The PLC runs the pump on the level: start at 70 %, stop at 35 % |
+| Substation | vacuum/pressure gauge **PIV-801** on transformer TR-1 | robot photo + vision |
+| Boiler room | thermomanometer **PI-201** | robot photo + vision |
+| Pipe rack | nitrogen header gauge **PI-610** | robot photo + vision |
+| Workshop | old worn gauge **PI-402**, unreadable on purpose | the model must say "no legible", not guess |
+| Control room, pumps | extinguishers **EXT-14**, **EXT-12** | robot photo + vision (on its bracket or not) |
 
-`world` plays the physical plant: the pressure line, the PLC (a real S7 server on port 1102), what the robot's camera sees, the valve and the extinguisher. It is the only thing that is not software in real life.
+The robot (`robot-01`) speeds up and slows down, slows at turns, spends battery per metre and charges at its base when it is low. Its round is shorter than a pressure peak, so it always gets to PI-104 in time.
 
-The rules also watch the extinguisher: if the robot sees EXT-12 missing or with low pressure, `extintor-ext-12` raises a notice (no order).
+`world` plays the physical plant: the process, the PLC (a real S7 server), what the camera sees and the valve. It is the only thing that is not software in real life, and it lives on the field network only.
 
 ## The dataset
 
-What the plant "does" comes from files, so every run tells the same story and it is easy to change:
+- [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv): the incoming pressure over one cycle. Flow, level, pump and temperature follow from it with simple physics.
+- [dataset/fotos/](dataset/fotos) and [fotos.csv](dataset/fotos.csv): 23 photos with their true value.
+  - **Real photos** from Wikimedia Commons (CC BY, CC BY-SA, CC0), one per point of the round, read by hand. Authors and licences are in [dataset/fotos/CREDITOS.md](dataset/fotos/CREDITOS.md) and next to each photo in the console.
+  - **PI-104**, the gauge that has to move with the line, is still generated: 15 photos every 0.25 bar from 4.0 to 7.0, two of them with glare or blur. The camera hands over the one closest to what the dial shows, so the photo and the PLC always agree.
 
-- [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv): the line pressure over one cycle with XV-104 open. The PLC publishes it with a little electrical noise. Closing the valve brings it down to 4.2 bar whatever the profile says.
-- [dataset/fotos.csv](dataset/fotos.csv) and [dataset/fotos/](dataset/fotos): 19 photos with their true value. 15 of PI-104 every 0.25 bar from 4.0 to 7.0 (two of them with glare or blur, as an outdoor camera gets) and 4 of EXT-12 (fine, low pressure, missing). In each round the camera hands over the photo closest to what the dial shows, so the photo and the PLC always agree.
-
-The photos are synthetic, made with the generator of poi-vision-inspector (`python scripts/make_dataset.py`). Real photos replace them without touching code: drop the file in `dataset/fotos` and add its line, with the value you read, to `fotos.csv`.
+`python scripts/make_dataset.py --originales <folder>` rebuilds it: it resizes the originals and writes the true values, the credits and the recorded answers.
 
 ### Which model reads the photos
 
@@ -112,26 +91,26 @@ ollama pull qwen3-vl
 INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_DWELL_S=15 docker compose up --build
 ```
 
-A local model needs a few seconds per photo (more without a GPU), so let the robot wait longer at each stop with `ROBOT_DWELL_S`.
-
 ## The namespace
 
 One hierarchy, `site/area/device/value`, named like the plant's P&ID (in Spanish, as in the plant; the code is in English):
 
 | Topic | Published by | Retained | Example value |
 |---|---|---|---|
-| `planta1/exterior/pi-104/presion` | inspector | yes | `6.75` bar, confidence 0.94 |
-| `planta1/exterior/pi-104/presion/inspeccion` | inspector | yes | the whole inspection: checks, model, prompt and image hash |
-| `planta1/exterior/ext-12/estado` | inspector | yes | `OK` / `NOK`, with the reason |
-| `planta1/exterior/pt-104/presion` | plc-gateway | yes | `6.71` bar |
+| `planta1/exterior/pt-104/presion`, `ft-104/caudal`, `tt-104/temperatura` | plc-gateway | yes | `6.71` bar, `42.5` m3/h, `39.2` °C |
 | `planta1/exterior/pt-104/alarma-alta` | plc-gateway | yes | `true` (the PLC's own bit) |
-| `planta1/exterior/reglas/<rule>` | rules | yes | `activa` / `normal`, with the inputs that decided |
+| `planta1/tanques/lt-101/nivel`, `p-104/marcha`, `p-104/corriente`, `p-104/arranques` | plc-gateway | yes | `62` %, `true`, `21.5` A, `12` |
+| `planta1/<area>/<device>/<value>` of each point of the round | inspector | yes | `6.75` bar, `OK` / `NOK`, with quality and confidence |
+| `…/inspeccion` under each of them | inspector | yes | the whole inspection: checks, model, prompt and image hash |
+| `planta1/reglas/<rule>` | rules | yes | `activa` / `normal`, with the inputs that decided |
 | `planta1/exterior/xv-104/orden` | rules | **no** | `cerrar` |
 | `planta1/exterior/xv-104/estado` | robot | yes | `abierta` / `cerrada` |
 | `planta1/robots/robot-01/foto` | robot | no | `IMG_0412`, with `poi` and `image_url` |
+| `planta1/robots/robot-01/posicion` | robot | yes | state, `x`, `y`, `rumbo`, `velocidad`, `bateria` (5 per second, not stored) |
 | `planta1/robots/robot-01/mision` | robot | yes | `en-camino` / `completada` |
-| `planta1/robots/robot-01/posicion` | robot | yes | `en-ruta` / `inspeccionando` / `en-mision`…, with `x`, `y`, `rumbo` (5 per second, not stored) |
 | `planta1/servicios/<service>` | each service | yes | `online` / `offline` (Last Will) |
+| `planta1/servicios/rules/config` | rules | yes | the rules it is running, and the allowed orders |
+| `planta1/simulacion/…` | simulador | | demo only: the scenario and the disturbance button |
 
 Every message follows one contract. Only `value` is mandatory, extra fields are kept:
 
@@ -142,67 +121,86 @@ Every message follows one contract. Only `value` is mandatory, extra fields are 
 
 ## Rules
 
-Plain YAML, readable by whoever runs the plant ([config/rules.yaml](config/rules.yaml)):
+Built in the console from the variables of the UNS, or written by hand ([config/rules.yaml](config/rules.yaml) is the starting point):
 
 ```yaml
 - id: sobrepresion-linea-104
   mode: act                 # notify: alarm only · act: alarm + orders
   when:                     # all of them, each one recent enough
-    - { topic: planta1/exterior/pi-104/presion, above: 6.0, max_age_s: 45, quality: good }
-    - { topic: planta1/exterior/pt-104/presion, above: 6.0, max_age_s: 30 }
+  - {topic: planta1/exterior/pi-104/presion, above: 6.0, max_age_s: 45, quality: good}
+  - {topic: planta1/exterior/pt-104/presion, above: 6.0, max_age_s: 30}
   clear_when:               # hysteresis: clears below 5.5, not 6.0
-    - { topic: planta1/exterior/pt-104/presion, below: 5.5 }
+  - {topic: planta1/exterior/pt-104/presion, below: 5.5}
   on_trigger:
-    - { topic: planta1/exterior/xv-104/orden, value: cerrar }
+  - {topic: planta1/exterior/xv-104/orden, value: cerrar}
 ```
+
+The rules travel through the UNS. The engine publishes the ones it runs on `planta1/servicios/rules/config` and takes new ones on `…/config/set` (only the console's user may publish there). It validates them, keeps them in its volume and answers. A rule can only send orders from `RULES_ORDERS`, a whitelist that lives outside the rules: whoever edits them cannot invent a new command for the plant.
+
+## Security
+
+The demo applies the basics of IEC 62443 at laptop scale, and the console's **Ciberseguridad** page tests two of them live.
+
+- **Zones.** Four Docker networks: `campo` (the plant and its PLC), `uns` (broker and services), `datos` (the database) and `publica`. The PLC is only on `campo`; `campo` and `datos` have no way out. Robot, PLC gateway and simulator bridge are the only ones on both sides, each passing only its own data.
+- **Identity.** No anonymous MQTT. One user per service, passwords hashed in the broker at start.
+- **Least privilege.** One ACL per user ([config/mosquitto/acl](config/mosquitto/acl)): each service writes only its own topics. The console can only read, plus two requests: new rules and the demo's button. It cannot send an order to the plant, and the console proves it.
+- **Validated input.** Rules are validated by the engine, orders come from the whitelist.
+- **Least functionality.** Containers without Linux capabilities, without privilege escalation and, ours, with a read-only filesystem. The PLC gateway cannot write.
+- **Untouchable history.** Grafana reads with a database user that can only `SELECT`.
+- **Exposed:** only the console (8000) and Grafana (3000). The broker only on `127.0.0.1:1883`, for [MQTT Explorer](https://mqtt-explorer.com) with the read-only user `explorer` / `explorer`.
+
+Not done yet, for the public server: TLS, secrets out of the repository (the passwords here are demo ones, in `config/mosquitto/passwords` and `docker-compose.yml`) and centralised audit logs. The CI checks the rest on every push: anonymous access refused, an order from the console dropped, Grafana unable to delete history.
 
 ## Design decisions
 
 - **The UNS is the only interface.** No service calls another. The inspector does not know the rules exist; the rules do not know the value came from a camera. Adding a second robot or a third plant means publishing under a new branch.
-- **Two sources before acting.** A single bad photo or a noisy transmitter never sends a robot. Uncertain photos are published (the dashboard can show them) but rules require `quality: good`.
+- **Two sources before acting.** A single bad photo or a noisy transmitter never sends a robot. Uncertain photos are published, but rules require `quality: good`.
 - **Freshness is measured by the receiver.** `max_age_s` uses the rule engine's clock at arrival, not the timestamp in the payload, so a device with a wrong clock cannot fake a recent value. Retained values are history, so they never trigger a rule.
 - **Orders are not retained.** States are (a late subscriber gets the current picture), orders are not: a robot that restarts must not replay yesterday's `cerrar`.
-- **Fire once, clear with margin.** An active rule does not fire again until it clears, and it clears at 5.5 bar, not 6.0. No order storms around the threshold.
-- **Notify first, act later.** Same file, one word. That is how automatic actions earn trust in a plant.
-- **Reuse, not copy.** The PLC side is [plc-mqtt-gateway](https://github.com/aseinotegi/plc-mqtt-gateway), built straight from its repository. Its per-tag `topic` option puts the PLC value at its UNS path.
-- **Historian that survives restarts.** Batched inserts (one transaction per second), rows kept in memory while the database restarts, schema created on start. TimescaleDB hypertables when available, plain PostgreSQL otherwise.
+- **Fire once, clear with margin.** An active rule does not fire again until it clears, and it clears at 5.5 bar, not 6.0. Saving the rules keeps an active rule active, so it never sends the same order twice.
+- **Notify first, act later.** Same rule, one word. That is how automatic actions earn trust in a plant.
+- **Reuse, not copy.** The PLC side is [plc-mqtt-gateway](https://github.com/aseinotegi/plc-mqtt-gateway), the vision [poi-vision-inspector](https://github.com/aseinotegi/poi-vision-inspector) and the console [plant-console](https://github.com/aseinotegi/plant-console), all built straight from their repositories.
+- **Historian that survives restarts.** Batched inserts, rows kept in memory while the database restarts, schema created on start. Inspections are kept whole, as events.
 
 ## Project layout
 
 ```text
 src/uns_demo/
   uns.py        the namespace and the message contract
-  bus.py        MQTT for every service: Last Will status, retained or live-only subscriptions
-  world.py      simulated plant: PLC profile, S7 PLC (DB1), camera from the dataset, valve
+  bus.py        MQTT for every service: user, Last Will status, retained or live-only subscriptions
+  world.py      simulated plant: process, S7 PLC (DB1), camera from the dataset, valve
   plant.py      plant map and route geometry (config/planta.yaml)
-  robot.py      walks the route, stops, photos, missions
-  rules.py      YAML rules, pure engine (messages in, messages out)
+  robot.py      walks the route, photos, missions, battery; serves its photos and map
+  sim.py        demo controls (scenario, disturbance) through the UNS
+  rules.py      rules engine: pure evaluation, whitelist, rules over MQTT
   historian.py  UNS → TimescaleDB, batched and resilient
   tree.py       prints the namespace
-config/         plant map, rules, gateway tags, inspector (replay / Ollama), broker
-dataset/        photos with their true values, PLC pressure profile, recorded answers
+config/         plant map, rules, gateway tags, inspector (replay / Ollama), broker users and ACL
+dataset/        photos with their true values and credits, PLC pressure profile, recorded answers
 grafana/        datasource and dashboard, provisioned
-scripts/        end-to-end smoke test (used by CI), dataset generator
+scripts/        end-to-end smoke test (used by CI), dataset builder
 ```
 
 ## Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                  # 72 tests, no broker or database needed
+pytest -q                  # 89 tests, no broker or database needed
 ./scripts/smoke-test.sh    # the whole stack in Docker, checked end to end
 ```
 
-CI runs the unit tests on Python 3.10–3.13 and then the full `docker compose` stack, waiting until the database shows the whole chain: alarm, order, valve closed, alarm cleared.
+CI runs the unit tests on Python 3.10–3.13 and then the full `docker compose` stack: it waits until the database shows the whole chain (alarm, order, valve closed, alarm cleared) and then checks the security controls.
 
 ## Part of a series
 
 | Repository | Role in the story |
 |---|---|
-| [plc-mqtt-gateway](https://github.com/aseinotegi/plc-mqtt-gateway) | PLC → MQTT, used here for PT-104 |
+| [plant-console](https://github.com/aseinotegi/plant-console) | The web console of this plant |
+| [poi-vision-inspector](https://github.com/aseinotegi/poi-vision-inspector) | Reads the robot's photos |
+| [plc-mqtt-gateway](https://github.com/aseinotegi/plc-mqtt-gateway) | PLC → MQTT |
 | [robot-fleet-watchdogs](https://github.com/aseinotegi/robot-fleet-watchdogs) | Rules and watchdogs for a real robot fleet |
 | [andersein.com](https://andersein.com) | The story, drawn |
 
 ---
 
-MIT License · [Ander Sein](https://andersein.com) · [aseinotegi@gmail.com](mailto:aseinotegi@gmail.com)
+MIT License · [Ander Sein](https://andersein.com) · [aseinotegi@gmail.com](mailto:aseinotegi@gmail.com). The real photos keep their own licences ([credits](dataset/fotos/CREDITOS.md)).

@@ -20,7 +20,15 @@ Design choices:
   when the value arrived, so a device with a wrong clock cannot fake freshness.
 * Once active, a rule does not fire again until it clears. No order storms.
 * ``notify`` first, ``act`` once the rule has earned trust. Same file, one word.
+* A rule can only send the orders of a whitelist (``RULES_ORDERS``), kept outside the
+  rules: whoever edits the rules cannot invent a new command for the plant.
 * The engine is pure (messages in, messages out), so it is tested without a broker.
+
+The rules also travel through the UNS. The engine publishes the rules it is running
+on ``planta1/servicios/rules/config`` (retained), and takes new ones on
+``.../config/set`` (only the console may publish there, see config/mosquitto/acl):
+it validates them, saves them to its file and answers on the same state topic. The
+file is also watched, so editing it by hand works too.
 """
 
 from __future__ import annotations
@@ -116,7 +124,23 @@ class Rule:
         return {c.topic for c in self.when + self.clear_when}
 
 
-def parse_rules(raw: object) -> list[Rule]:
+Order = tuple[str, str]  # topic, value: one order a rule may send
+
+DEFAULT_ORDERS: frozenset[Order] = frozenset({(f"{uns.SITE}/exterior/xv-104/orden", "cerrar")})
+
+
+def parse_orders(text: str) -> frozenset[Order]:
+    """``topic=value,topic=value`` (RULES_ORDERS) into the whitelist of orders."""
+    orders = set()
+    for item in filter(None, (part.strip() for part in text.split(","))):
+        topic, sep, value = item.partition("=")
+        if not sep or not topic or not value:
+            raise RuleError(f"RULES_ORDERS: '{item}' is not topic=value")
+        orders.add((topic, value))
+    return frozenset(orders)
+
+
+def parse_rules(raw: object, allowed_orders: frozenset[Order] | None = None) -> list[Rule]:
     if not isinstance(raw, dict) or not isinstance(raw.get("rules"), list) or not raw["rules"]:
         raise RuleError("the file needs a non-empty 'rules' list")
     rules: list[Rule] = []
@@ -141,7 +165,12 @@ def parse_rules(raw: object) -> list[Rule]:
         for action in item.get("on_trigger") or []:
             if not isinstance(action, dict) or {"topic", "value"} - action.keys():
                 raise RuleError(f"{where}: each action needs 'topic' and 'value'")
+            order = (str(action["topic"]), str(action["value"]))
+            if allowed_orders is not None and order not in allowed_orders:
+                raise RuleError(f"{where}: order {order[1]!r} to {order[0]} is not in the allowed list")
             actions.append(Action(str(action["topic"]), action["value"]))
+        if mode == "act" and not actions:
+            raise RuleError(f"{where}: mode 'act' needs at least one order in 'on_trigger'")
         rules.append(Rule(rule_id, str(item.get("description", "")), mode, when, clear_when, actions))
     ids = [r.id for r in rules]
     if len(ids) != len(set(ids)):
@@ -149,8 +178,35 @@ def parse_rules(raw: object) -> list[Rule]:
     return rules
 
 
-def load_rules(path: str | Path) -> list[Rule]:
-    return parse_rules(yaml.safe_load(Path(path).read_text(encoding="utf-8")))
+def load_rules(path: str | Path, allowed_orders: frozenset[Order] | None = None) -> list[Rule]:
+    return parse_rules(yaml.safe_load(Path(path).read_text(encoding="utf-8")), allowed_orders)
+
+
+HEADER = """\
+# Rules evaluated on every live value of the UNS. Edited from the console (Reglas) or by hand.
+#
+#   mode        notify: raise the alarm only · act: also send the orders in on_trigger
+#   when        all conditions must hold, each value no older than max_age_s
+#               compare with above / below (numbers) or equals / not_equals (any value)
+#   clear_when  any condition clears the alarm (hysteresis: clear below a lower value)
+#   on_trigger  only orders of the allowed list (RULES_ORDERS)
+
+"""
+
+
+def dump_rules(rules: list[dict]) -> str:
+    """The rules as the YAML file the engine reads, one flow-style line per condition."""
+
+    class Dumper(yaml.SafeDumper):
+        pass
+
+    def represent_dict(dumper, data):
+        flow = all(not isinstance(v, (dict, list)) for v in data.values())
+        return dumper.represent_mapping("tag:yaml.org,2002:map", data, flow_style=flow)
+
+    Dumper.add_representer(dict, represent_dict)
+    body = yaml.dump({"rules": rules}, Dumper=Dumper, sort_keys=False, allow_unicode=True, width=120)
+    return HEADER + body.replace("\n- id:", "\n\n- id:").replace("rules:\n\n", "rules:\n")
 
 
 Output = tuple[str, Message, bool]  # topic, message, retain
@@ -173,6 +229,11 @@ class RuleEngine:
         for rule in rules:
             rule.active = rule.id in active
         self.rules = rules
+
+    def states(self) -> list[Output]:
+        """The state of every rule, to publish when they are loaded: a rule that never
+        fired is "normal", not unknown."""
+        return [self._state(rule, "activa" if rule.active else "normal") for rule in self.rules]
 
     def on_message(self, topic: str, message: Message) -> list[Output]:
         now = self._clock()
@@ -211,14 +272,23 @@ class RuleEngine:
 
 def main() -> int:
     import os
+    import shutil
 
     from .bus import Bus, setup_logging, stop_on_signal
 
     setup_logging()
     path = Path(os.environ.get("RULES_FILE", "config/rules.yaml"))
-    engine = RuleEngine(load_rules(path))
+    seed = os.environ.get("RULES_DEFAULT")  # first start with an empty volume: copy the shipped rules
+    if seed and not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(seed, path)
+        log.info("no rules yet in %s: starting from %s", path, seed)
+    allowed = parse_orders(os.environ["RULES_ORDERS"]) if os.environ.get("RULES_ORDERS") else DEFAULT_ORDERS
+    engine = RuleEngine(load_rules(path, allowed))
     bus = Bus("rules")
     lock = threading.Lock()
+    state_topic = f"{uns.SERVICES}/rules/config"
+    raw_rules: list[dict] = yaml.safe_load(path.read_text(encoding="utf-8"))["rules"]
 
     def on_value(topic: str, message: Message) -> None:
         with lock:
@@ -228,39 +298,83 @@ def main() -> int:
         for out_topic, out_message, retain in outputs:
             bus.publish(out_topic, out_message, retain=retain)
 
-    def announce(state: str, detail: str) -> None:
-        extra = {"rules": [r.id for r in engine.rules], "detail": detail}
-        bus.publish(f"{uns.SERVICES}/rules/config", Message(state, extra=extra), True)
+    def announce(state: str, detail: str, request: object = None) -> None:
+        extra = {
+            "detail": detail,
+            "rules": raw_rules,
+            "orders": [{"topic": t, "value": v} for t, v in sorted(allowed)],
+        }
+        if request is not None:
+            extra["request"] = request
+        bus.publish(state_topic, Message(state, extra=extra), True)
 
-    # Everything under the site, filtered by the engine: an edited file can watch new
-    # topics without resubscribing. A retained value may be hours old: live values only.
+    seen = [path.stat().st_mtime]
+
+    def publish_states(before: set[str]) -> None:
+        """Every rule's state, and removed rules out of the UNS."""
+        with lock:
+            outputs = engine.states()
+            now = {r.id for r in engine.rules}
+        for out_topic, out_message, retain in outputs:
+            bus.publish(out_topic, out_message, retain=retain)
+        for gone in before - now:
+            bus.clear(f"{uns.RULES}/{gone}")
+
+    def on_set(topic: str, message: Message) -> None:
+        """New rules from the console: validate, save, run, answer. Never a half state."""
+        nonlocal raw_rules
+        request = message.extra.get("request")
+        candidate = message.extra.get("rules")
+        try:
+            rules = parse_rules({"rules": candidate}, allowed)
+        except RuleError as exc:
+            log.warning("rules from %s refused: %s", message.source, exc)
+            announce("error", str(exc), request)
+            return
+        with lock:
+            before = {r.id for r in engine.rules}
+            path.write_text(dump_rules(candidate), encoding="utf-8")
+            seen[0] = path.stat().st_mtime
+            engine.replace(rules)
+            raw_rules = candidate
+        log.info("rules from %s applied: %d rules", message.source, len(rules))
+        announce("recargadas", f"{len(rules)} reglas", request)
+        publish_states(before)
+
+    # Everything under the site, filtered by the engine: new rules can watch new topics
+    # without resubscribing. A retained value may be hours old: live values only.
     bus.subscribe(f"{uns.SITE}/#", on_value, retained=False)
+    bus.subscribe(f"{state_topic}/set", on_set, retained=False)
     stop = stop_on_signal()
     bus.start()
     log.info("%d rules loaded, watching %d topics", len(engine.rules), len(engine.topics))
-    announce("cargadas", str(path))
+    announce("cargadas", f"{len(engine.rules)} reglas")
+    publish_states(set())
 
-    # The file is the source of truth: when it changes (the console saves it), reload.
-    # A broken file is refused and the rules that were running keep running.
-    seen = path.stat().st_mtime
+    # Hand edits of the file are picked up too. A broken file is refused and the rules
+    # that were running keep running.
     while not stop.wait(2):
         try:
             mtime = path.stat().st_mtime
         except OSError:
             continue
-        if mtime == seen:
+        if mtime == seen[0]:
             continue
-        seen = mtime
+        seen[0] = mtime
         try:
-            rules = load_rules(path)
+            text = path.read_text(encoding="utf-8")
+            rules = load_rules(path, allowed)
         except (RuleError, yaml.YAMLError, OSError) as exc:
             log.error("rules file not reloaded, keeping the previous rules: %s", exc)
             announce("error", str(exc))
             continue
         with lock:
+            before = {r.id for r in engine.rules}
             engine.replace(rules)
+            raw_rules = yaml.safe_load(text)["rules"]
         log.info("rules reloaded: %d rules, %d topics", len(rules), len(engine.topics))
         announce("recargadas", f"{len(rules)} reglas")
+        publish_states(before)
     bus.stop()
     return 0
 

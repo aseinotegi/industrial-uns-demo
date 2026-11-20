@@ -1,134 +1,237 @@
-# The story of andersein.com, running: robot photo → vision → UNS ← PLC → rules → robot → dashboard.
+# The story of andersein.com, running: robot photo → vision → UNS ← PLC → rules → robot → console.
 #
-#   docker compose up --build        then open http://localhost:8000 (console) and :3000 (Grafana)
+#   docker compose up --build        then open http://localhost:8000 (console)
 #   docker compose run --rm tree     the whole namespace, right now
 #
 # Vision: by default the inspector answers from dataset/respuestas-de-prueba.json (no
 # model needed). With a real model (Ollama on the PC, see config/inspector.ollama.yaml):
 #   INSPECTOR_CONFIG=inspector.ollama.yaml docker compose up --build
+#
+# Security (see README, "Ciberseguridad"):
+# * four networks, as zones of IEC 62443: campo (the plant and its PLC), uns (the
+#   broker and the services), datos (the historian's database) and publica (what a
+#   browser reaches). The PLC is only on campo; campo and datos have no way out.
+# * one MQTT user per service with its ACL (config/mosquitto/acl), no anonymous access.
+# * containers without Linux capabilities, without privilege escalation and, ours,
+#   with a read-only filesystem.
+# * only the console (8000) and Grafana (3000) are published; the broker only on
+#   localhost, for MQTT Explorer with the read-only user "explorer".
+# Passwords are demo ones, the same here and in config/mosquitto/passwords. Change both
+# before running this anywhere but your own computer.
+
+x-hardened: &hardened
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
 
 x-service: &service
+  <<: *hardened
   build: .
   image: industrial-uns-demo:local
-  restart: unless-stopped
-  depends_on: [broker]
-  environment:
-    MQTT_HOST: broker
-    WORLD_URL: http://world:8080
-    PLANT_FILE: /app/config/planta.yaml
-    # Speed the story up for a quick look: see "Quick start" in the README
-    WORLD_TIME_SCALE: ${WORLD_TIME_SCALE:-1}
-    ROBOT_SPEED: ${ROBOT_SPEED:-1.5}      # m/s along the route of config/planta.yaml
-    ROBOT_DWELL_S: ${ROBOT_DWELL_S:-3}    # time at each stop
-    ROBOT_ACTION_S: ${ROBOT_ACTION_S:-4}  # time to close the valve
+  read_only: true
+  tmpfs: [/tmp]
+
+x-mqtt: &mqtt
+  MQTT_HOST: broker
 
 services:
   broker:
+    <<: *hardened
     image: eclipse-mosquitto:2
-    ports: ["1883:1883"]
+    user: "1883:1883"
+    read_only: true
+    tmpfs: [/tmp]
+    # Passwords are hashed at start, never stored in clear inside the container's config.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        cp /mosquitto/config/passwords /tmp/mosquitto-passwd &&
+        cp /mosquitto/config/acl /tmp/mosquitto-acl &&
+        chmod 0700 /tmp/mosquitto-passwd /tmp/mosquitto-acl &&
+        mosquitto_passwd -U /tmp/mosquitto-passwd &&
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
     volumes:
-      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/mosquitto:/mosquitto/config:ro
+    ports: ["127.0.0.1:1883:1883"]
+    networks: [uns]
 
-  # The physical plant: PT-104 wired to a Siemens S7 PLC, local gauge PI-104, manual valve XV-104.
+  # The physical plant: line 104, tank, pump, the Siemens S7 PLC and what the camera sees.
+  # Field network only: nothing outside campo can reach the PLC.
   world:
     <<: *service
     command: ["uns-world"]
+    environment:
+      WORLD_TIME_SCALE: ${WORLD_TIME_SCALE:-1}
+      PLANT_FILE: /app/config/planta.yaml
     volumes:
       - ./config/planta.yaml:/app/config/planta.yaml:ro
+    networks: [campo]
 
-  # Reads the PLC and publishes PT-104 straight into its UNS path.
+  # Reads the PLC and publishes its tags straight into their UNS paths. Read-only.
   plc-gateway:
+    <<: *hardened
     build: https://github.com/aseinotegi/plc-mqtt-gateway.git#main
     image: plc-gateway:uns-demo
-    restart: unless-stopped
     depends_on: [broker, world]
     environment:
+      <<: *mqtt
       PLC_HOST: world
       PLC_PORT: "1102"
-      MQTT_HOST: broker
+      MQTT_USERNAME: plc-gateway
+      MQTT_PASSWORD: demo-plc-gateway
     volumes:
       - ./config/plc-gateway.yaml:/config/config.yaml:ro
+    networks: [campo, uns]
 
+  # The inspection robot: walks the map, takes the photos, closes the valve. It serves
+  # its photos and its map to the plant network, like a real one.
   robot:
     <<: *service
     command: ["uns-robot"]
     depends_on: [broker, world]
+    environment:
+      <<: *mqtt
+      MQTT_USERNAME: robot-01
+      MQTT_PASSWORD: demo-robot-01
+      WORLD_URL: http://world:8080
+      ROBOT_URL: http://robot:8081
+      PLANT_FILE: /app/config/planta.yaml
+      ROBOT_SPEED: ${ROBOT_SPEED:-1.5}            # m/s along config/planta.yaml
+      ROBOT_ACCEL: ${ROBOT_ACCEL:-0.6}            # m/s²
+      ROBOT_DWELL_S: ${ROBOT_DWELL_S:-3}          # time at each stop
+      ROBOT_ACTION_S: ${ROBOT_ACTION_S:-4}        # time to close the valve
+      ROBOT_CHARGE_RATE: ${ROBOT_CHARGE_RATE:-3}  # % per second at the base
     volumes:
       - ./config/planta.yaml:/app/config/planta.yaml:ro
+    networks: [campo, uns]
+
+  # Demo only: the scenario and the disturbance button, through the UNS.
+  simulador:
+    <<: *service
+    command: ["uns-sim"]
+    depends_on: [broker, world]
+    environment:
+      <<: *mqtt
+      MQTT_USERNAME: simulador
+      MQTT_PASSWORD: demo-simulador
+      WORLD_URL: http://world:8080
+    networks: [campo, uns]
 
   # Reads the robot's photos with a multimodal model and publishes what it saw to the UNS.
   inspector:
+    <<: *hardened
     build: https://github.com/aseinotegi/poi-vision-inspector.git#main
     image: poi-vision-inspector:uns-demo
-    restart: unless-stopped
-    depends_on: [broker, world]
+    depends_on: [broker, robot]
     environment:
-      MQTT_HOST: broker
+      <<: *mqtt
+      MQTT_USERNAME: inspector
+      MQTT_PASSWORD: demo-inspector
       POI_PROVIDER_URL: ${POI_PROVIDER_URL:-}
       POI_PROVIDER_MODEL: ${POI_PROVIDER_MODEL:-}
     extra_hosts: ["host.docker.internal:host-gateway"]  # Ollama running on the PC
     volumes:
       - ./config/${INSPECTOR_CONFIG:-inspector.yaml}:/app/config/inspector.yaml:ro
       - ./dataset/respuestas-de-prueba.json:/app/config/respuestas.json:ro
+    networks: [uns]
 
+  # Cross-checks the UNS and decides. Its rules live in a volume (edited from the
+  # console); config/rules.yaml is the starting point. To start over: docker compose down -v
   rules:
     <<: *service
     command: ["uns-rules"]
     environment:
-      MQTT_HOST: broker
-      RULES_FILE: /app/config/rules.yaml
+      <<: *mqtt
+      MQTT_USERNAME: rules
+      MQTT_PASSWORD: demo-rules
+      RULES_FILE: /data/rules.yaml
+      RULES_DEFAULT: /app/config/rules.yaml
+      RULES_ORDERS: planta1/exterior/xv-104/orden=cerrar  # the only order a rule may send
     volumes:
-      # read-write for the console, which edits it; the engine reloads it when it changes
-      - ./config/rules.yaml:/app/config/rules.yaml
-
-  # The plant's HMI: the robot on the map, the PLC, the namespace, the rules and the vision.
-  console:
-    build: https://github.com/aseinotegi/plant-console.git#main
-    image: plant-console:uns-demo
-    restart: unless-stopped
-    depends_on: [broker, world, rules]
-    # It edits config/rules.yaml on this machine, whoever owns the file. On Linux you can
-    # run it as yourself instead: CONSOLE_UID=$(id -u) docker compose up
-    user: "${CONSOLE_UID:-0}"
-    environment:
-      MQTT_HOST: broker
-      WORLD_URL: http://world:8080
-      RULES_FILE: /app/config/rules.yaml
-    ports: ["8000:8000"]
-    volumes:
-      - ./config/rules.yaml:/app/config/rules.yaml
+      - ./config/rules.yaml:/app/config/rules.yaml:ro
+      - reglas:/data
+    networks: [uns]
 
   historian:
     <<: *service
     command: ["uns-historian"]
     depends_on: [broker, timescaledb]
     environment:
-      MQTT_HOST: broker
-      DATABASE_URL: postgresql://uns:uns@timescaledb:5432/uns
+      <<: *mqtt
+      MQTT_USERNAME: historian
+      MQTT_PASSWORD: demo-historian
+      DATABASE_URL: postgresql://uns:${DB_PASSWORD:-demo-uns}@timescaledb:5432/uns
+    networks: [uns, datos]
 
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
     environment:
       POSTGRES_USER: uns
-      POSTGRES_PASSWORD: uns
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-demo-uns}
       POSTGRES_DB: uns
-    ports: ["5432:5432"]
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}  # read-only user for Grafana
+    volumes:
+      - ./config/timescaledb:/docker-entrypoint-initdb.d:ro
+    networks: [datos]
 
   grafana:
+    <<: *hardened
     image: grafana/grafana-oss:11.3.0
     depends_on: [timescaledb]
     ports: ["3000:3000"]
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ALLOW_EMBEDDING: "true"       # shown inside the console
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-demo-admin}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/linea-104.json
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [datos, publica]
+
+  # The plant's HMI: the robot on the map, PLC, UNS, rules, vision, history, MQTT live,
+  # architecture and security.
+  console:
+    <<: *hardened
+    build: https://github.com/aseinotegi/plant-console.git#main
+    image: plant-console:uns-demo
+    depends_on: [broker, robot]
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      <<: *mqtt
+      MQTT_USERNAME: console
+      MQTT_PASSWORD: demo-console
+      ROBOT_URL: http://robot:8081
+      GRAFANA_URL: ${GRAFANA_URL:-}   # as the browser sees it; empty: same host, port 3000
+    ports: ["8000:8000"]
+    networks: [uns, publica]
 
   # On demand: docker compose run --rm tree
   tree:
     <<: *service
     command: ["uns-tree"]
     restart: "no"
+    environment:
+      <<: *mqtt
+      MQTT_USERNAME: tree
+      MQTT_PASSWORD: demo-tree
     profiles: [tools]
+    networks: [uns]
+
+networks:
+  campo:
+    internal: true  # the plant floor: no way out, no way in from outside
+  uns: {}
+  datos:
+    internal: true
+  publica: {}
+
+volumes:
+  reglas:

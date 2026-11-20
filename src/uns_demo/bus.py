@@ -34,6 +34,8 @@ class Bus:
         self._client.will_set(
             self._status_topic, Message("offline", source=name).to_json(), qos=1, retain=True
         )
+        if os.environ.get("MQTT_USERNAME"):  # the broker has one user per service, with its ACL
+            self._client.username_pw_set(os.environ["MQTT_USERNAME"], os.environ.get("MQTT_PASSWORD"))
         self._client.reconnect_delay_set(min_delay=1, max_delay=15)
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
@@ -63,6 +65,10 @@ class Bus:
         if message.source is None:
             message.source = self.name
         self._client.publish(topic, message.to_json(), qos=1, retain=retain)
+
+    def clear(self, topic: str) -> None:
+        """Removes a retained value from the broker (an empty retained message)."""
+        self._client.publish(topic, b"", qos=1, retain=True)
 
     def subscribe(self, pattern: str, handler: Handler, retained: bool = True) -> None:
         """``retained=False`` skips the broker's stored last values: history, not news."""

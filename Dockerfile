@@ -5,7 +5,8 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN pip install --no-cache-dir . \
-    && useradd --create-home --uid 10001 uns
+    && useradd --create-home --uid 10001 uns \
+    && mkdir /data && chown uns /data   # the rules engine keeps its rules here (a volume)
 
 COPY config ./config
 COPY dataset ./dataset

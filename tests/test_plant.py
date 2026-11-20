@@ -22,7 +22,18 @@ def test_locate_finds_the_closest_point_of_the_route():
 
 def test_the_shipped_plant_has_its_stops_on_the_route_in_order():
     plant = load_plant()
-    assert [s.device for s in plant.stops] == ["PI-104", "XV-104", "EXT-12"]
+    assert [s.device for s in plant.stops] == [
+        "BASE-1",
+        "PIV-801",
+        "EXT-14",
+        "PI-104",
+        "XV-104",
+        "PI-201",
+        "PI-402",
+        "PI-610",
+        "EXT-12",
+    ]
+    assert [s.s for s in plant.stops] == sorted(s.s for s in plant.stops)  # in the order it walks
     for stop in plant.stops:
         assert plant.route.at(stop.s)[0] == pytest.approx(stop.point)
     devices = {d["id"] for d in plant.raw["equipos"]}
@@ -34,3 +45,19 @@ def test_unknown_stop_actions_are_refused(tmp_path):
     path.write_text("ruta: [[0, 0], [5, 0]]\nparadas: [{punto: [1, 0], accion: bailar, equipo: X}]")
     with pytest.raises(ValueError, match="bailar"):
         load_plant(path)
+
+
+def test_every_instrument_of_the_round_is_close_enough_to_its_stop_for_a_photo():
+    import math
+
+    plant = load_plant()
+    devices = {d["id"]: d for d in plant.raw["equipos"]}
+    for stop in plant.stops:
+        d = devices[stop.device]
+        assert math.dist(stop.point, (d["x"], d["y"])) < 7.5, stop.device
+
+
+def test_distance_to_the_next_turn():
+    route = Route([(0, 0), (10, 0), (10, 5)])
+    assert route.to_corner(4) == pytest.approx(6)
+    assert route.to_corner(4, -1) == pytest.approx(4)

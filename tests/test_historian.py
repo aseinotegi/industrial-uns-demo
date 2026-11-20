@@ -86,3 +86,17 @@ def test_large_bursts_flush_on_their_own():
     for i in range(25):
         historian.add(uns.PT_104, Message(4.0 + i / 100))
     assert len(db.rows["measurements"]) == 20
+
+
+def test_an_inspection_is_kept_whole_even_when_it_read_a_number():
+    table, row = to_row(
+        "planta1/auxiliares/pi-610/presion/inspeccion", Message(21.0, extra={"poi": "PI-610"})
+    )
+    assert table == "events" and '"poi": "PI-610"' in row[3]
+
+
+def test_the_robot_position_and_the_scenario_are_not_stored():
+    historian = Historian(connect=lambda: None)
+    historian.add(uns.ROBOT_POSE, Message("en-ruta"))
+    historian.add(uns.SIM_SCENARIO, Message(12.0))
+    assert historian._rows == {"measurements": [], "events": []}

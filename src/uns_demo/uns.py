@@ -43,12 +43,18 @@ PI_104 = path(SITE, "exterior", "pi-104", "presion")  # local gauge, read from t
 PT_104 = path(SITE, "exterior", "pt-104", "presion")  # transmitter, read by the PLC
 XV_104_ORDER = path(SITE, "exterior", "xv-104", "orden")  # what the rules ask for
 XV_104_STATE = path(SITE, "exterior", "xv-104", "estado")  # what the robot saw / did
-RULES = path(SITE, "exterior", "reglas")  # one subtopic per rule
+RULES = path(SITE, "reglas")  # one subtopic per rule, whatever area it watches
 ROBOT = path(SITE, "robots", "robot-01")
 ROBOT_PHOTO = f"{ROBOT}/foto"
+ROBOT_LAST_PHOTO = f"{ROBOT}/ultima-foto"  # one retained topic per point of interest
 ROBOT_MISSION = f"{ROBOT}/mision"
 ROBOT_POSE = f"{ROBOT}/posicion"  # x, y, heading and state, several times a second
 SERVICES = path(SITE, "servicios")  # online/offline of every service (Last Will)
+# Demo only, not part of a plant: the scenario of the simulator and the button that
+# starts a disturbance. Kept apart so nobody mistakes it for a plant signal.
+SIMULATION = path(SITE, "simulacion")
+SIM_SCENARIO = f"{SIMULATION}/escenario"
+SIM_DISTURB = f"{SIMULATION}/perturbacion"
 
 
 def now_iso() -> str:

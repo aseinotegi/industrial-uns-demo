@@ -4,9 +4,9 @@ datasources:
     uid: timescale
     type: grafana-postgresql-datasource
     url: timescaledb:5432
-    user: uns
+    user: grafana  # read-only (config/timescaledb/10-grafana-readonly.sh)
     secureJsonData:
-      password: uns
+      password: $GRAFANA_DB_PASSWORD
     jsonData:
       database: uns
       sslmode: disable

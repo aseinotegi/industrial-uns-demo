@@ -20,7 +20,22 @@ gateway:
   reconnect_max_s: 15
 
 tags:
+  # DB1 of PLC-1, as packed by the simulated plant (src/uns_demo/world.py)
   - { name: pt_104_presion,     address: DB1.DBD0,   type: REAL, unit: bar, deadband: 0.02,
       topic: planta1/exterior/pt-104/presion }
   - { name: pt_104_alarma_alta, address: DB1.DBX4.0, type: BOOL,
       topic: planta1/exterior/pt-104/alarma-alta }
+  - { name: p_104_marcha,       address: DB1.DBX4.1, type: BOOL,
+      topic: planta1/tanques/p-104/marcha }
+  - { name: lt_101_alarma_alta, address: DB1.DBX4.2, type: BOOL,
+      topic: planta1/tanques/lt-101/alarma-alta }
+  - { name: ft_104_caudal,      address: DB1.DBD6,   type: REAL, unit: m3/h, deadband: 0.3,
+      topic: planta1/exterior/ft-104/caudal }
+  - { name: tt_104_temperatura, address: DB1.DBD10,  type: REAL, unit: "°C", deadband: 0.1,
+      topic: planta1/exterior/tt-104/temperatura }
+  - { name: lt_101_nivel,       address: DB1.DBD14,  type: REAL, unit: "%", deadband: 0.2,
+      topic: planta1/tanques/lt-101/nivel }
+  - { name: p_104_corriente,    address: DB1.DBD18,  type: REAL, unit: A, deadband: 0.3,
+      topic: planta1/tanques/p-104/corriente }
+  - { name: p_104_arranques,    address: DB1.DBW22,  type: INT,
+      topic: planta1/tanques/p-104/arranques }

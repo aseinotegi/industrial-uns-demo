@@ -49,14 +49,16 @@ HYPERTABLES = [
 
 # Live-only topics: the robot's position several times a second is for the console,
 # not for the history (the photos and missions already say where it has been).
-NOT_STORED = (uns.ROBOT_POSE,)
+NOT_STORED = (uns.ROBOT_POSE, uns.SIM_SCENARIO)
 
 
 def to_row(topic: str, message: Message) -> tuple[str, tuple]:
     """Which table a message goes to, and the row."""
     time = uns.parse_ts(message.ts)
     number = message.number
-    if number is not None:
+    # An inspection is a record (photo, checks, model), not a sample: it goes to events
+    # even when it read a number, so the whole of it is kept.
+    if number is not None and not topic.endswith("/inspeccion"):
         return "measurements", (time, topic, number, message.unit, message.source, message.quality)
     payload = json.loads(message.to_json())
     return "events", (time, topic, str(message.value), json.dumps(payload, ensure_ascii=False))
@@ -87,7 +89,7 @@ class Historian:
         conn.commit()
 
     def add(self, topic: str, message: Message) -> None:
-        if topic in NOT_STORED:
+        if topic in NOT_STORED or topic.startswith(uns.SIMULATION):
             return
         table, row = to_row(topic, message)
         with self._lock:

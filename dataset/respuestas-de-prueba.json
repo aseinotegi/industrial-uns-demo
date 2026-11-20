@@ -105,28 +105,56 @@
   "confidence": 0.2,
   "evidence": "the needle is blurred, the scale cannot be read"
  },
- "aa7b1482e6df17257d1cfa1620e14824d7135496e288e6f0b8f67e3d2f66ac97": {
+ "a8c9e7280230ce3799c1bd2f7915b862e47b20a5e59220f12233655dd96ca1cb": {
+  "value": 21.0,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.9,
+  "evidence": "WIKA 0-25 bar gauge, needle just past 20"
+ },
+ "5989559ef6863b36ed494b53182620c121ce607a5d5cc69eee88fdf22d0b2c44": {
+  "value": 1.7,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.88,
+  "evidence": "red pressure needle between 1.5 and 2 bar on the upper scale"
+ },
+ "1a50b2bcb3381ac0ed689bf602630086d6d03d64ebb7c039f45911b5345daea8": {
+  "value": -20.0,
+  "unit": "kPa",
+  "status_reason": "lectura_valida",
+  "confidence": 0.85,
+  "evidence": "vacuum/pressure gauge, needle on -20 kPa"
+ },
+ "228e4321b85a29c7ef6ad86cc7950a638d84cf9ba3a0d4b26c82ecad01416dda": {
+  "value": null,
+  "unit": null,
+  "status_reason": "no_legible",
+  "confidence": 0.3,
+  "evidence": "dirty, worn dial: the scale numbers cannot be read"
+ },
+ "8c227a2f81f0968efb3dbf7847798cb79ffb8a75d9f3725ff7ed7a22bb21e575": {
   "value": "OK",
   "status_reason": "correcto",
-  "confidence": 0.93,
-  "evidence": "extinguisher correcto"
+  "confidence": 0.92,
+  "evidence": "CO2 extinguisher hanging on its wall bracket"
  },
- "542c995cc599fdc6f5ae788bd916e9d9af46514730f316166f893a4ce83224d6": {
+ "8135700f25c77798df325af8784844dfb722e374252f5fb7aec2d94dfc9e7292": {
+  "value": "NOK",
+  "status_reason": "fuera_de_soporte",
+  "confidence": 0.9,
+  "evidence": "CO2 extinguisher lying on the floor, not on its bracket"
+ },
+ "304be58e33422b45de837abc0d9b84b68789cd9808b08034b50e9fbeca111869": {
   "value": "OK",
   "status_reason": "correcto",
-  "confidence": 0.93,
-  "evidence": "extinguisher correcto"
+  "confidence": 0.86,
+  "evidence": "extinguisher on the wall under its sign"
  },
- "ea0a532367da42b7c3ab855493a680af7305ddbbc2be1c9b0fc5c91f7791f84a": {
+ "1de37c68a7581de1cdc708c8c8d2a017bad38b5a9468639a863cbf402b96a16a": {
   "value": "NOK",
-  "status_reason": "presion_baja",
-  "confidence": 0.93,
-  "evidence": "extinguisher presion baja"
- },
- "930bb1b0b3917b33aa4f43f42580ba8e6c6e77dfb551fbaddcdcf7a2c99d9f45": {
-  "value": "NOK",
-  "status_reason": "ausente",
-  "confidence": 0.93,
-  "evidence": "extinguisher ausente"
+  "status_reason": "fuera_de_soporte",
+  "confidence": 0.9,
+  "evidence": "powder extinguishers standing on the floor, off their bracket"
  }
 }

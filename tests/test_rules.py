@@ -3,7 +3,15 @@ from pathlib import Path
 import pytest
 
 from uns_demo import uns
-from uns_demo.rules import RuleEngine, RuleError, load_rules, parse_rules
+from uns_demo.rules import (
+    DEFAULT_ORDERS,
+    RuleEngine,
+    RuleError,
+    dump_rules,
+    load_rules,
+    parse_orders,
+    parse_rules,
+)
 from uns_demo.uns import Message
 
 RULES_FILE = Path(__file__).resolve().parents[1] / "config" / "rules.yaml"
@@ -39,8 +47,13 @@ def topics(outputs):
 
 def test_the_shipped_rules_file_is_valid():
     rules = load_rules(RULES_FILE)
-    assert [r.id for r in rules] == ["sobrepresion-linea-104", "extintor-ext-12"]
-    assert [r.mode for r in rules] == ["act", "notify"]
+    assert [r.id for r in rules] == [
+        "sobrepresion-linea-104",
+        "nivel-alto-t-101",
+        "extintor-ext-12",
+        "extintor-ext-14",
+    ]
+    assert [r.mode for r in rules] == ["act", "notify", "notify", "notify"]
 
 
 def test_fires_only_when_vision_and_plc_agree(engine):
@@ -124,7 +137,8 @@ def test_text_values_never_satisfy_numeric_conditions(engine):
 
 def test_subscribes_only_to_the_topics_it_needs(engine):
     eng, _ = engine
-    assert eng.topics == {uns.PI_104, uns.PT_104, EXT_12}
+    assert {uns.PI_104, uns.PT_104, EXT_12} <= eng.topics
+    assert not any(t.endswith("/posicion") or "/servicios/" in t for t in eng.topics)
 
 
 @pytest.mark.parametrize(
@@ -158,3 +172,50 @@ def test_reloading_the_rules_keeps_an_active_rule_active(engine):
     eng.replace(load_rules(RULES_FILE))  # the console saved the file
     assert eng.on_message(uns.PI_104, vision(6.9)) == []  # no second order
     assert topics(eng.on_message(uns.PT_104, plc(5.0))) == [ALARM]  # and it still clears
+
+
+def test_orders_outside_the_whitelist_are_refused():
+    rule = {
+        "id": "abre-todo",
+        "mode": "act",
+        "when": [{"topic": "a", "above": 1}],
+        "clear_when": [{"topic": "a", "below": 0}],
+        "on_trigger": [{"topic": "planta1/exterior/xv-104/orden", "value": "abrir"}],
+    }
+    with pytest.raises(RuleError, match="not in the allowed list"):
+        parse_rules({"rules": [rule]}, DEFAULT_ORDERS)
+    rule["on_trigger"][0]["value"] = "cerrar"
+    assert parse_rules({"rules": [rule]}, DEFAULT_ORDERS)[0].on_trigger[0].value == "cerrar"
+
+
+def test_act_without_orders_is_refused():
+    rule = {
+        "id": "r",
+        "mode": "act",
+        "when": [{"topic": "a", "above": 1}],
+        "clear_when": [{"topic": "a", "below": 0}],
+    }
+    with pytest.raises(RuleError, match="at least one order"):
+        parse_rules({"rules": [rule]})
+
+
+def test_the_whitelist_comes_from_topic_value_pairs():
+    assert parse_orders("a/orden=cerrar, b/orden=parar") == {("a/orden", "cerrar"), ("b/orden", "parar")}
+    with pytest.raises(RuleError):
+        parse_orders("a/orden")
+
+
+def test_rules_written_back_are_read_the_same():
+    import yaml
+
+    raw = yaml.safe_load(RULES_FILE.read_text(encoding="utf-8"))["rules"]
+    again = yaml.safe_load(dump_rules(raw))["rules"]
+    assert again == raw
+    assert len(parse_rules({"rules": again}, DEFAULT_ORDERS)) == len(raw)
+
+
+def test_every_rule_has_a_state_from_the_start(engine):
+    eng, _ = engine
+    states = eng.states()
+    assert {t for t, _, _ in states} == {f"{uns.RULES}/{r.id}" for r in eng.rules}
+    assert {m.value for _, m, _ in states} == {"normal"}

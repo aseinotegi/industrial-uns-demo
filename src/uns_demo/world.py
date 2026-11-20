@@ -1,11 +1,17 @@
 """The physical plant, simulated: what in real life is steel, not software.
 
-It owns the truth that the other services can only observe:
+It owns the truth that the other services can only observe. Line 104 brings water
+from the plant header into tank T-101, and pump P-104 sends it on to unit 2:
+
+    header ─▶ XV-104 ─▶ PI-104 · PT-104 · FT-104 · TT-104 ─▶ T-101 (LT-101) ─▶ P-104 ─▶ unit 2
 
 * the line pressure, measured twice: by transmitter PT-104 (wired to the PLC) and
   by local gauge PI-104 (a dial with no signal; only a photo can read it);
-* manual valve XV-104, which only the robot can close;
-* fire extinguisher EXT-12, on the robot's round too.
+* flow, temperature, tank level and the pump, all wired to the PLC, which runs the
+  pump on the tank level (start at 70 %, stop at 35 %);
+* manual valve XV-104, which only the robot can close: closed, the line loses its
+  pressure, the flow stops and the tank stops filling;
+* the gauges and extinguishers of the robot's round, seen through real photos.
 
 It exposes them the way a real plant would:
 
@@ -101,15 +107,22 @@ class Profile:
 @dataclass
 class Scenario:
     profile: Profile
-    reopen_at_s: float = 170.0  # operator reopens XV-104, ready for the next cycle
+    reopen_at_s: float | None = None  # operator reopens XV-104 (default: 15 s before the end)
     decay_s: float = 6.0  # time constant once the valve is closed
     follow_s: float = 1.0  # how closely the line follows the profile
+
+    time_scale: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.reopen_at_s is None:
+            self.reopen_at_s = self.profile.cycle_s - 15.0 * self.time_scale
 
     @classmethod
     def from_env(cls, dataset: Path | None = None) -> Scenario:
         scale = float(os.environ.get("WORLD_TIME_SCALE", "1"))  # < 1 runs the story faster
         profile = Profile.load((dataset or default_dataset()) / "plc" / "linea-104.csv", scale)
-        return cls(profile, reopen_at_s=170.0 * scale, decay_s=6.0 * scale, follow_s=1.0 * scale)
+        reopen = profile.cycle_s - 15.0 * scale
+        return cls(profile, reopen_at_s=reopen, decay_s=6.0 * scale, follow_s=1.0 * scale, time_scale=scale)
 
     @property
     def cycle_s(self) -> float:
@@ -175,6 +188,78 @@ class Line:
         return round(self.pressure + 0.08 + self._rng.gauss(0, 0.02), 3)
 
 
+# -- the rest of line 104: flow, temperature, tank and pump ----------------------
+
+TANK_M3 = 4.0  # T-101, small on purpose so the level moves while you watch
+PUMP_M3H = 60.0  # P-104
+LEVEL_START, LEVEL_STOP, LEVEL_HIGH = 70.0, 35.0, 90.0  # PLC level control, %
+TANK_BAR = 1.0  # back pressure of the tank
+
+
+class Process:
+    """What happens around the pressure: flow into the tank, its level, the pump, the heat.
+
+    The PLC logic (start and stop the pump on the level) lives here too, because in
+    this plant it is the PLC's program, not something a service can change.
+    """
+
+    def __init__(self, line: Line, seed: int | None = None) -> None:
+        self.line = line
+        self.flow = 0.0  # FT-104, m3/h
+        self.temperature = 38.0  # TT-104, °C
+        self.level = 52.0  # LT-101, %
+        self.pump_on = False
+        self.current = 0.0  # P-104 motor, A
+        self.starts = 0
+        self._since_start = 99.0
+        self._rng = random.Random(seed)
+
+    def step(self, dt: float) -> None:
+        sc = self.line.scenario
+        speed = 1 / sc.time_scale  # the whole story runs faster with WORLD_TIME_SCALE < 1
+        p = self.line.pressure
+        valve_open = not self.line.valve_closed
+
+        target_flow = 20.0 * math.sqrt(max(p - TANK_BAR, 0)) if valve_open else 0.0
+        self.flow += (target_flow - self.flow) * (1 - math.exp(-dt * speed / 2.0))
+
+        # PLC program: level control of T-101 with P-104, with hysteresis
+        if not self.pump_on and self.level >= LEVEL_START:
+            self.pump_on, self._since_start = True, 0.0
+            self.starts += 1
+        elif self.pump_on and self.level <= LEVEL_STOP:
+            self.pump_on = False
+        out = PUMP_M3H if self.pump_on else 0.0
+        self.level += (self.flow - out) / 3600 / TANK_M3 * 100 * dt * speed
+        self.level = min(max(self.level, 0.0), 100.0)
+
+        # motor current: start-up peak that fades in a second or two, then the running load
+        self._since_start += dt * speed
+        if self.pump_on:
+            running = 21.5 + 0.6 * math.sin(self._since_start / 7)
+            inrush = 95.0 * math.exp(-self._since_start / 0.8)
+            self.current = running + inrush
+        else:
+            self.current = 0.0
+
+        # a little warmer when the pressure is up, cooling slowly when nothing flows
+        target_t = 38.0 + 1.4 * (p - 4.2) if valve_open else 31.0
+        self.temperature += (target_t - self.temperature) * (1 - math.exp(-dt * speed / 25.0))
+
+    def tags(self) -> dict[str, float | bool | int]:
+        """The PLC inputs as the transmitters give them, with their electrical noise."""
+        g = self._rng.gauss
+        return {
+            "pressure": self.line.transmitter(),
+            "flow": round(max(self.flow + g(0, 0.15), 0.0), 2),
+            "temperature": round(self.temperature + g(0, 0.05), 2),
+            "level": round(self.level + g(0, 0.05), 2),
+            "current": round(self.current + (g(0, 0.2) if self.pump_on else 0.0), 2),
+            "pump_on": self.pump_on,
+            "starts": self.starts,
+        }
+
+
 # -- the camera ----------------------------------------------------------------
 
 
@@ -184,6 +269,13 @@ class Photo:
     poi: str
     value: str
     condition: str
+    author: str = ""
+    license: str = ""
+    source: str = ""
+
+    @property
+    def is_state(self) -> bool:
+        return self.value in ("OK", "NOK")
 
 
 class Camera:
@@ -195,7 +287,18 @@ class Camera:
         self.folder = dataset / "fotos"
         with (dataset / "fotos.csv").open(encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
-        self.photos = [Photo(r["archivo"], r["poi"], r["valor"], r["condicion"]) for r in rows]
+        self.photos = [
+            Photo(
+                r["archivo"],
+                r["poi"],
+                r["valor"],
+                r["condicion"],
+                r.get("autor", ""),
+                r.get("licencia", ""),
+                r.get("fuente", ""),
+            )
+            for r in rows
+        ]
         self._by_file = {p.file: p for p in self.photos}
         self._rng = random.Random(seed)
         self._trouble_rate = trouble_rate
@@ -211,7 +314,9 @@ class Camera:
             raise KeyError(poi)
         if poi.upper() == "PI-104":
             return self._gauge(photos, line.gauge())
-        return self._state_photo(poi.upper(), photos)
+        if any(p.is_state for p in photos):
+            return self._state_photo(poi.upper(), photos)
+        return self._rng.choice(photos)  # a gauge that does not move in this story
 
     def _gauge(self, photos: list[Photo], dial: float) -> Photo:
         nearest = min({float(p.value) for p in photos}, key=lambda v: abs(v - dial))
@@ -237,6 +342,9 @@ class Camera:
         self._state[poi] = (current, left - 1)
         return self._rng.choice(current)
 
+    def credits(self) -> dict[str, dict[str, str]]:
+        return {p.file: {"autor": p.author, "licencia": p.license, "fuente": p.source} for p in self.photos}
+
     def read(self, file: str) -> bytes:
         if file not in self._by_file:  # only files listed in the dataset, never a path
             raise KeyError(file)
@@ -246,15 +354,31 @@ class Camera:
 # -- the PLC -------------------------------------------------------------------
 
 DB_NUMBER = 1
-DB_SIZE = 8  # DBD0 REAL pt-104 pressure · DBX4.0 BOOL high pressure
+DB_SIZE = 24
+# DB1 of PLC-1 (Siemens S7), what plc-mqtt-gateway reads (config/plc-gateway.yaml):
+#   DBD0   REAL  PT-104 pressure, bar
+#   DBX4.0 BOOL  PT-104 high pressure (> 6.0 bar)
+#   DBX4.1 BOOL  P-104 running
+#   DBX4.2 BOOL  LT-101 high level (> 90 %)
+#   DBD6   REAL  FT-104 flow, m3/h
+#   DBD10  REAL  TT-104 temperature, °C
+#   DBD14  REAL  LT-101 level, %
+#   DBD18  REAL  P-104 motor current, A
+#   DBW22  INT   P-104 starts since power-up
 
 
-def pack_db(db: bytearray, pressure: float) -> None:
-    struct.pack_into(">f", db, 0, pressure)
-    db[4] = 1 if pressure > PLC_ALARM_BAR else 0
+def pack_db(db: bytearray, tags: dict) -> None:
+    struct.pack_into(">f", db, 0, tags["pressure"])
+    db[4] = (
+        (1 if tags["pressure"] > PLC_ALARM_BAR else 0)
+        | (2 if tags["pump_on"] else 0)
+        | (4 if tags["level"] > LEVEL_HIGH else 0)
+    )
+    struct.pack_into(">ffff", db, 6, tags["flow"], tags["temperature"], tags["level"], tags["current"])
+    struct.pack_into(">h", db, 22, min(tags["starts"], 32767))
 
 
-def serve_plc(line: Line, port: int, stop: threading.Event) -> None:
+def serve_plc(process: Process, port: int, stop: threading.Event) -> None:
     import snap7
     from snap7.type import SrvArea
 
@@ -265,7 +389,7 @@ def serve_plc(line: Line, port: int, stop: threading.Event) -> None:
     log.info("PLC listening on port %d (DB%d)", port, DB_NUMBER)
     try:
         while not stop.wait(0.1):
-            pack_db(db, line.transmitter())
+            pack_db(db, process.tags())
     finally:
         server.stop()
 
@@ -304,6 +428,8 @@ def make_handler(line: Line, camera: Camera, plant: dict | None = None) -> type[
                     self._send(404, {"error": "unknown point of interest"})
                     return
                 self._send(200, {"poi": photo.poi, "photo": photo.file})
+            elif self.path == "/fotos":
+                self._send(200, camera.credits())
             elif self.path.startswith("/fotos/"):
                 self._send_photo(self.path.removeprefix("/fotos/"))
             elif self.path == "/valves/xv-104":
@@ -349,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
     from .plant import load_plant
 
     parser = argparse.ArgumentParser(
-        prog="uns-world", description="Simulated plant: PLC, gauge, manual valve and extinguisher"
+        prog="uns-world", description="Simulated plant: line 104, tank, pump, PLC and the round's photos"
     )
     parser.add_argument("--plc-port", type=int, default=1102)
     parser.add_argument("--http-port", type=int, default=8080)
@@ -359,17 +485,19 @@ def main(argv: list[str] | None = None) -> int:
     stop = stop_on_signal()
     dataset = default_dataset()
     line = Line(Scenario.from_env(dataset))
+    process = Process(line)
     camera = Camera(dataset)
     plant = load_plant().raw
     http = ThreadingHTTPServer(("0.0.0.0", args.http_port), make_handler(line, camera, plant))
     threading.Thread(target=http.serve_forever, daemon=True).start()
-    threading.Thread(target=serve_plc, args=(line, args.plc_port, stop), daemon=True).start()
+    threading.Thread(target=serve_plc, args=(process, args.plc_port, stop), daemon=True).start()
     log.info("world API on port %d, %d photos in the dataset", args.http_port, len(camera.photos))
 
     start = last = time.monotonic()
     while not stop.wait(0.1):
         now = time.monotonic()
         line.step(now - start, now - last)
+        process.step(now - last)
         last = now
     http.shutdown()
     return 0

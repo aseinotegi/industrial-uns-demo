@@ -19,7 +19,7 @@ Point = tuple[float, float]
 @dataclass(frozen=True)
 class Stop:
     point: Point
-    action: str  # "foto" | "valvula"
+    action: str  # "foto" | "valvula" | "carga"
     device: str
     s: float  # where it is along the route
 
@@ -67,6 +67,14 @@ class Route:
                 best_s, best_d = start + t * seg, d
         return best_s
 
+    def to_corner(self, s: float, direction: int = 1) -> float:
+        """Distance to the next turn of the route in that direction (where a robot slows down)."""
+        s %= self.length
+        corners = [*self._starts, self.length]
+        if direction > 0:
+            return min(c - s for c in corners if c - s > 1e-6)
+        return min(s - c for c in [0.0, *self._starts] if s - c > 1e-6) if s > 1e-6 else self.length
+
     def ahead(self, s_from: float, s_to: float) -> float:
         """Distance going forward along the loop from ``s_from`` to ``s_to``."""
         return (s_to - s_from) % self.length
@@ -102,7 +110,7 @@ def load_plant(path: Path | None = None) -> Plant:
     stops = []
     for item in raw.get("paradas", []):
         point = tuple(item["punto"])
-        if item["accion"] not in ("foto", "valvula"):
+        if item["accion"] not in ("foto", "valvula", "carga"):
             raise ValueError(f"unknown stop action {item['accion']!r}")
         stops.append(Stop(point, item["accion"], item["equipo"], route.locate(point)))
     stops.sort(key=lambda stop: stop.s)

@@ -1,41 +1,82 @@
 # Map of the plant, in metres (x to the right, y down, as on a drawing).
 #
-# The robot walks `ruta` in a loop, starting at the charging base, and stops at each
-# `paradas` point: photo of a point of interest or check of a valve. The console draws
-# the same file, so what you see is where the robot really is.
+# The robot walks `ruta` in a loop, starting at its charging base, and stops at each
+# `paradas` point: photo of a point of interest, check of a valve, or charge. The
+# console draws this same file, so what you see is where the robot really is.
+#
+#   header ─▶ XV-104 ─▶ PI-104 · PT-104 · FT-104 · TT-104 ─▶ T-101 ─▶ P-104 ─▶ unit 2
 
-nombre: Planta 1 · exterior línea 104
-ancho: 52
-alto: 38
+nombre: Planta 1 · Línea 104 y servicios
+ancho: 80
+alto: 48
 
+# Buildings and fenced areas. tipo: edificio (walls), area (painted on the floor),
+# cubeto (tank bund), vallado (fence)
 zonas:
-  - { id: sala-electrica, nombre: Sala eléctrica, x: 1, y: 1, ancho: 10, alto: 9 }
-  - { id: linea-104, nombre: Línea 104, x: 12, y: 7, ancho: 38, alto: 9 }
-  - { id: base, nombre: Base de carga, x: 2, y: 29, ancho: 8, alto: 7 }
+  - { id: sala-control, nombre: Sala de control, tipo: edificio, x: 2, y: 2, ancho: 12.5, alto: 10, puertas: [[14.5, 8]] }
+  - { id: subestacion, nombre: Subestación, tipo: vallado, x: 2, y: 16, ancho: 12, alto: 11 }
+  - { id: linea-104, nombre: Línea 104, tipo: area, x: 20, y: 2, ancho: 58, alto: 8.5 }
+  - { id: cubeto, nombre: Cubeto T-101, tipo: cubeto, x: 20, y: 16, ancho: 12, alto: 12 }
+  - { id: bombas, nombre: Bombeo, tipo: area, x: 34, y: 20, ancho: 10, alto: 8 }
+  - { id: calderas, nombre: Sala de calderas, tipo: edificio, x: 62, y: 16, ancho: 16, alto: 12, puertas: [[66, 16], [66, 28]], rotulo: [68, 27.2] }
+  - { id: rack, nombre: Rack de tuberías, tipo: area, x: 20, y: 34.5, ancho: 58, alto: 3, rotulo: [20.7, 35.3] }
+  - { id: taller, nombre: Taller, tipo: edificio, x: 62, y: 38, ancho: 16, alto: 8, puertas: [[66, 38], [62, 42]], rotulo: [68, 45.3] }
+  - { id: base, nombre: Base del robot, tipo: area, x: 3, y: 40, ancho: 10, alto: 6.5, rotulo: [9.6, 46] }
 
-# The line itself, for the drawing: the pipe and what hangs on it.
+# Pipes, for the drawing. linea: which flow they carry; the arrow follows the order.
 tuberias:
-  - { id: linea-104, desde: [12, 12], hasta: [50, 12] }
+  - { id: linea-104, nombre: "Línea 104 · desde colector", linea: proceso, puntos: [[79, 6], [26, 6], [26, 18]] }
+  - { id: aspiracion-p104, linea: proceso, puntos: [[30, 24], [36, 24]] }
+  - { id: impulsion-p104, nombre: "a Unidad 2", linea: proceso, puntos: [[40, 24], [56, 24], [56, 31], [79, 31]] }
+  - { id: nitrogeno, nombre: "N2 · 21 bar", linea: nitrogeno, puntos: [[20, 36], [79, 36]] }
 
+# Equipment and instruments. senal: its value in the UNS (the console shows it live).
 equipos:
-  - { id: PLC-1, tipo: plc, x: 5, y: 5, nombre: PLC Siemens S7 }
-  - { id: PT-104, tipo: transmisor, x: 16, y: 12, nombre: Transmisor de presión, cable: PLC-1 }
-  - { id: PI-104, tipo: manometro, x: 22, y: 12, nombre: Manómetro local }
-  - { id: XV-104, tipo: valvula, x: 32, y: 12, nombre: Válvula manual }
-  - { id: EXT-12, tipo: extintor, x: 49, y: 26, nombre: Extintor }
-  - { id: BASE-1, tipo: base, x: 6, y: 32, nombre: Base de carga }
+  - { id: PLC-1, tipo: plc, x: 6, y: 5.5, nombre: PLC Siemens S7 }
+  - { id: SCADA, tipo: puesto, x: 10.5, y: 5.5, nombre: Puesto de operación }
+  - { id: EXT-14, tipo: extintor, x: 15.1, y: 10.4, nombre: Extintor de polvo, senal: planta1/control/ext-14/estado }
+  - { id: TR-1, tipo: transformador, x: 8, y: 21.5, nombre: Transformador 20/0,4 kV }
+  - { id: PIV-801, tipo: manometro, x: 12.6, y: 21.5, nombre: Presión-vacío cuba TR-1, senal: planta1/subestacion/tr-1/presion, rango: [-100, 100], unidad: kPa }
+  - { id: XV-104, tipo: valvula, x: 56, y: 6, nombre: Válvula manual de entrada, senal: planta1/exterior/xv-104/estado }
+  - { id: PI-104, tipo: manometro, x: 46, y: 6, nombre: Manómetro local, senal: planta1/exterior/pi-104/presion, rango: [0, 10], unidad: bar }
+  - { id: PT-104, tipo: transmisor, x: 40, y: 6, nombre: Transmisor de presión, senal: planta1/exterior/pt-104/presion, cable: PLC-1 }
+  - { id: FT-104, tipo: caudalimetro, x: 34, y: 6, nombre: Caudalímetro, senal: planta1/exterior/ft-104/caudal, cable: PLC-1 }
+  - { id: TT-104, tipo: transmisor, letras: TT, x: 30, y: 6, nombre: Temperatura, senal: planta1/exterior/tt-104/temperatura, cable: PLC-1 }
+  - { id: T-101, tipo: tanque, x: 26, y: 22, radio: 4, nombre: Depósito 4 m³, senal: planta1/tanques/lt-101/nivel }
+  - { id: LT-101, tipo: transmisor, x: 30.8, y: 18.6, nombre: Nivel, senal: planta1/tanques/lt-101/nivel, cable: PLC-1 }
+  - { id: P-104, tipo: bomba, x: 38, y: 24, nombre: Bomba de trasiego, senal: planta1/tanques/p-104/marcha, cable: PLC-1 }
+  - { id: CALDERA, tipo: caldera, x: 72.5, y: 22, nombre: Caldera de agua caliente }
+  - { id: PI-201, tipo: manometro, x: 68.2, y: 22, nombre: Termomanómetro de caldera, senal: planta1/calderas/pi-201/presion, rango: [0, 6], unidad: bar }
+  - { id: PI-610, tipo: manometro, x: 44, y: 36, nombre: Colector de nitrógeno, senal: planta1/auxiliares/pi-610/presion, rango: [0, 25], unidad: bar }
+  - { id: EXT-12, tipo: extintor, x: 34.6, y: 38.4, nombre: Extintor CO2 del bombeo, senal: planta1/exterior/ext-12/estado }
+  - { id: COMPRESOR, tipo: compresor, x: 73, y: 42, nombre: Compresor antiguo (fuera de servicio) }
+  - { id: PI-402, tipo: manometro, x: 69.4, y: 42, nombre: Manómetro del compresor viejo, senal: planta1/taller/pi-402/presion, rango: [0, 16], unidad: bar }
+  - { id: BASE-1, tipo: base, x: 8, y: 44.6, nombre: Base de carga }
 
-# Closed loop: after the last point the robot goes back to the first one.
+# Closed loop along the walkways: after the last point the robot goes back to the first.
 ruta:
-  - [6, 32]
-  - [6, 20]
-  - [22, 20]
-  - [32, 20]
-  - [46, 20]
-  - [46, 26]
-  - [46, 32]
+  - [8, 43]
+  - [8, 32]
+  - [17, 32]
+  - [17, 21.5]
+  - [17, 12.6]
+  - [46, 12.6]
+  - [56, 12.6]
+  - [66, 12.6]
+  - [66, 22]
+  - [66, 42]
+  - [56, 42]
+  - [44, 40]
+  - [32, 40]
+  - [8, 40]
 
 paradas:
-  - { punto: [22, 20], accion: foto, equipo: PI-104 }
-  - { punto: [32, 20], accion: valvula, equipo: XV-104 }
-  - { punto: [46, 26], accion: foto, equipo: EXT-12 }
+  - { punto: [8, 43], accion: carga, equipo: BASE-1 }
+  - { punto: [17, 21.5], accion: foto, equipo: PIV-801 }
+  - { punto: [17, 12.6], accion: foto, equipo: EXT-14 }
+  - { punto: [46, 12.6], accion: foto, equipo: PI-104 }
+  - { punto: [56, 12.6], accion: valvula, equipo: XV-104 }
+  - { punto: [66, 22], accion: foto, equipo: PI-201 }
+  - { punto: [66, 42], accion: foto, equipo: PI-402 }
+  - { punto: [44, 40], accion: foto, equipo: PI-610 }
+  - { punto: [32, 40], accion: foto, equipo: EXT-12 }

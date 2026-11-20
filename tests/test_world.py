@@ -3,7 +3,17 @@ from pathlib import Path
 
 import pytest
 
-from uns_demo.world import NORMAL_BAR, Camera, Line, Profile, Scenario, pack_db
+from uns_demo.world import (
+    LEVEL_START,
+    LEVEL_STOP,
+    NORMAL_BAR,
+    Camera,
+    Line,
+    Process,
+    Profile,
+    Scenario,
+    pack_db,
+)
 
 DATASET = Path(__file__).resolve().parents[1] / "dataset"
 
@@ -28,22 +38,22 @@ def test_profile_interpolates_between_its_points():
 
 def test_the_shipped_profile_goes_from_normal_to_peak_and_back():
     profile = scenario().profile
-    assert profile.cycle_s == 180
-    assert profile.at(0) == profile.at(180) == NORMAL_BAR
-    assert max(profile.at(t) for t in range(181)) == 6.8
+    assert profile.cycle_s == 360
+    assert profile.at(0) == profile.at(360) == NORMAL_BAR
+    assert max(profile.at(t) for t in range(361)) == 6.8
 
 
 def test_pressure_follows_the_profile_while_the_valve_is_open():
     line = Line(scenario(), seed=1)
-    run(line, 0, 35)
+    run(line, 0, 75)
     assert abs(line.pressure - NORMAL_BAR) < 0.01
-    run(line, 35, 80)
+    run(line, 75, 150)
     assert 6.0 < line.pressure <= 6.8
 
 
 def test_closing_the_valve_brings_pressure_back_to_normal():
     line = Line(scenario(), seed=1)
-    t = run(line, 0, 75)
+    t = run(line, 0, 150)
     assert line.close_valve() is True
     assert line.close_valve() is False  # already closed
     run(line, t, t + 40)
@@ -60,16 +70,62 @@ def test_operator_reopens_the_valve_at_the_end_of_the_cycle():
 def test_time_scale_shortens_the_whole_story(monkeypatch):
     monkeypatch.setenv("WORLD_TIME_SCALE", "0.1")
     sc = Scenario.from_env(DATASET)
-    assert sc.cycle_s == pytest.approx(18.0) and sc.reopen_at_s == pytest.approx(17.0)
+    assert sc.cycle_s == pytest.approx(36.0) and sc.reopen_at_s == pytest.approx(34.5)
+
+
+def tags(**kw):
+    base = {
+        "pressure": 4.2,
+        "flow": 36.0,
+        "temperature": 38.0,
+        "level": 50.0,
+        "current": 0.0,
+        "pump_on": False,
+        "starts": 3,
+    }
+    return {**base, **kw}
 
 
 def test_plc_data_block_layout():
-    db = bytearray(8)
-    pack_db(db, 6.7)
+    db = bytearray(24)
+    pack_db(db, tags(pressure=6.7, pump_on=True, level=93.0, current=21.5))
     assert abs(struct.unpack_from(">f", db, 0)[0] - 6.7) < 1e-6
-    assert db[4] == 1  # high pressure bit (> 6.0 bar)
-    pack_db(db, 4.2)
+    assert db[4] == 0b111  # high pressure, pump running, high level
+    flow, temp, level, current = struct.unpack_from(">ffff", db, 6)
+    assert (round(flow, 1), round(temp, 1), round(level, 1), round(current, 1)) == (36.0, 38.0, 93.0, 21.5)
+    assert struct.unpack_from(">h", db, 22)[0] == 3
+    pack_db(db, tags())
     assert db[4] == 0
+
+
+def test_the_plc_runs_the_pump_on_the_tank_level():
+    line = Line(scenario(), seed=1)
+    process = Process(line, seed=1)
+    process.level = LEVEL_START - 1
+    seen_on = seen_off_after = False
+    for _ in range(6000):  # 10 minutes
+        line.step(0, 0.1)
+        process.step(0.1)
+        if process.pump_on:
+            seen_on = True
+            assert process.current > 15
+        elif seen_on:
+            seen_off_after = True
+            assert process.level <= LEVEL_STOP + 1
+            break
+    assert seen_on and seen_off_after and process.starts == 1
+
+
+def test_closing_the_valve_stops_the_flow_into_the_tank():
+    line = Line(scenario(), seed=1)
+    process = Process(line, seed=1)
+    for _ in range(200):
+        process.step(0.1)
+    assert process.flow > 30
+    line.close_valve()
+    for _ in range(200):
+        process.step(0.1)
+    assert process.flow < 1
 
 
 def test_gauge_and_transmitter_see_the_same_line_with_their_own_error():
@@ -88,7 +144,7 @@ def test_every_photo_listed_in_the_dataset_exists_and_has_a_recorded_answer():
 
     camera = Camera(DATASET)
     answers = json.loads((DATASET / "respuestas-de-prueba.json").read_text(encoding="utf-8"))
-    assert camera.pois() == ["EXT-12", "PI-104"]
+    assert camera.pois() == ["EXT-12", "EXT-14", "PI-104", "PI-201", "PI-402", "PI-610", "PIV-801"]
     for photo in camera.photos:
         data = camera.read(photo.file)
         assert data[:2] == b"\xff\xd8", photo.file  # a JPEG
@@ -118,6 +174,19 @@ def test_the_extinguisher_is_mostly_fine_and_its_state_lasts_several_rounds():
     assert changes <= len(values) / 8  # never flips from one round to the next more than once per hold
 
 
+def test_real_photos_carry_their_credit():
+    credits = Camera(DATASET).credits()
+    real = {f: c for f, c in credits.items() if not f.startswith("pi-104")}
+    assert real and all(
+        c["licencia"].startswith("CC") and "wikimedia.org" in c["fuente"] for c in real.values()
+    )
+
+
+def test_a_gauge_that_does_not_move_always_gives_its_photo():
+    camera = Camera(DATASET, seed=1)
+    assert {camera.shoot("pi-610", Line(scenario())).file for _ in range(5)} == {"pi-610_21.0.jpg"}
+
+
 def test_only_dataset_files_can_be_read():
     camera = Camera(DATASET)
     with pytest.raises(KeyError):
@@ -130,7 +199,7 @@ def test_a_disturbance_can_be_asked_for_and_starts_at_once():
     line = Line(scenario(), seed=1)
     run(line, 0, 5)
     assert line.disturb_now() is True
-    t = run(line, 5, 30)
+    t = run(line, 5, 50)
     assert line.pressure > 6.0
     assert line.disturb_now() is False  # one at a time
     line.close_valve()
@@ -139,4 +208,4 @@ def test_a_disturbance_can_be_asked_for_and_starts_at_once():
 
 
 def test_profile_knows_when_the_disturbance_starts():
-    assert scenario().profile.rise_at == 40
+    assert scenario().profile.rise_at == 80

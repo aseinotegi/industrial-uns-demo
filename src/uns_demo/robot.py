@@ -9,8 +9,10 @@
 * Orders: when the rules ask for ``cerrar`` on XV-104, it leaves the round, goes to the
   valve by the shorter way along the route, closes it with the arm, reports back and
   carries on. Orders are not retained, so a restarted robot never replays an old one.
-* Position: several times a second it publishes where it is (x, y, heading) and what
-  it is doing. That is what the console draws.
+* Position: several times a second it publishes where it is (x, y, heading, speed,
+  battery) and what it is doing. That is what the console draws.
+* Like a real one it speeds up and slows down (no jumps to full speed), spends battery
+  per metre walked, and charges at its base when it is below ROBOT_CHARGE_BELOW.
 
 The robot is a state machine moved by ``tick(dt)``, so it is tested without clocks.
 """
@@ -21,9 +23,12 @@ import json
 import logging
 import os
 import queue
+import re
+import threading
 import time
 import urllib.request
 from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Protocol
 
 from . import uns
@@ -42,12 +47,15 @@ class World(Protocol):
 
 
 class HttpWorld:
-    def __init__(self, url: str) -> None:
+    """The physical world as the robot meets it: its camera and its arm (simulated)."""
+
+    def __init__(self, url: str, photos_url: str) -> None:
         self._url = url
+        self._photos_url = photos_url  # where the robot serves its own photos
 
     def photo(self, poi: str) -> str:
         with urllib.request.urlopen(f"{self._url}/camera/{poi.lower()}", timeout=5) as response:
-            return f"{self._url}/fotos/{json.load(response)['photo']}"
+            return f"{self._photos_url}/fotos/{json.load(response)['photo']}"
 
     def valve_closed(self) -> bool:
         with urllib.request.urlopen(f"{self._url}/valves/xv-104", timeout=5) as response:
@@ -56,6 +64,44 @@ class HttpWorld:
     def close_valve(self) -> None:
         request = urllib.request.Request(f"{self._url}/valves/xv-104/close", method="POST")
         urllib.request.urlopen(request, timeout=5).close()
+
+
+PHOTO_NAME = re.compile(r"^[a-z0-9_.-]+\.jpe?g$")
+
+
+def serve_photos(world_url: str, plant: Plant, port: int) -> ThreadingHTTPServer:
+    """The robot's own little server, like a real one has: the photos it took (with
+    their credits) and the map it walks. It is what the rest of the plant network sees;
+    the simulator behind it stays on the field network."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def _send(self, code: int, body: bytes, kind: str = "application/json") -> None:
+            self.send_response(code)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self) -> None:  # noqa: N802 (http.server naming)
+            if self.path == "/planta":
+                self._send(200, json.dumps(plant.raw).encode())
+                return
+            name = self.path.removeprefix("/fotos").lstrip("/")
+            if not self.path.startswith("/fotos") or (name and not PHOTO_NAME.match(name)):
+                self._send(404, b'{"error": "not found"}')
+                return
+            try:
+                with urllib.request.urlopen(f"{world_url}/fotos{'/' + name if name else ''}", timeout=5) as r:
+                    self._send(200, r.read(), r.headers.get("Content-Type", "application/octet-stream"))
+            except OSError:
+                self._send(404, b'{"error": "not found"}')
+
+        def log_message(self, *args) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
 
 
 Publish = Callable[[str, Message, bool], None]
@@ -70,6 +116,10 @@ class Robot:
         speed: float = 1.5,  # m/s
         dwell_s: float = 3.0,  # time at a stop
         action_s: float = 4.0,  # time to close the valve
+        accel: float = 0.6,  # m/s²
+        drain_per_m: float = 0.05,  # % of battery per metre
+        charge_rate: float = 3.0,  # % per second at the base
+        charge_below: float = 60.0,  # % under which it stays at the base to charge
     ) -> None:
         self._world = world
         self._plant = plant
@@ -88,6 +138,12 @@ class Robot:
         self._mission: Stop | None = None
         self._direction = 1  # +1 forward along the route, -1 backward (missions only)
         self._photos = 410
+        self._accel = accel
+        self._drain = drain_per_m
+        self._charge_rate = charge_rate
+        self._charge_below = charge_below
+        self.v = 0.0  # current speed, m/s
+        self.battery = 92.0
 
     # -- inputs ------------------------------------------------------------------
 
@@ -101,6 +157,14 @@ class Robot:
     # -- the state machine -------------------------------------------------------
 
     def tick(self, dt: float) -> None:
+        self._take_orders()  # an order interrupts a stop or a charge
+        if self.state == "cargando":
+            self.battery = min(100.0, self.battery + self._charge_rate * dt)
+            if self.battery < 95.0:
+                self.publish_pose()
+                return
+            if self._mission is None:
+                self._carry_on()
         if self._wait > 0:
             self._wait -= dt
             if self._wait <= 0:
@@ -110,19 +174,26 @@ class Robot:
             self.publish_pose()
             return
 
-        self._take_orders()
         target = self._mission or self._next
-        if target is None:  # a route without stops: just walk
-            self.s = (self.s + self._speed * dt) % self._route.length
+        remaining = self._distance_to(target) if target else float("inf")
+        # speed up to cruise speed, and brake in time to stop on the point
+        braking = (2 * self._accel * max(remaining, 0.0)) ** 0.5
+        corner = (2 * self._accel * self._route.to_corner(self.s, self._direction)) ** 0.5 + self._speed / 3
+        self.v = min(self._speed, self.v + self._accel * dt, max(min(braking, corner), 0.3))
+        step = self.v * dt
+        if target is not None and step >= remaining - ARRIVED:
+            step = max(remaining, 0.0)
+            self.s = target.s
+            self.v = 0.0
+            self._spend(step)
+            self._arrive(target)
         else:
-            remaining = self._distance_to(target)
-            step = self._speed * dt
-            if step >= remaining - ARRIVED:
-                self.s = target.s
-                self._arrive(target)
-            else:
-                self.s = (self.s + self._direction * step) % self._route.length
+            self.s = (self.s + self._direction * step) % self._route.length
+            self._spend(step)
         self.publish_pose()
+
+    def _spend(self, metres: float) -> None:
+        self.battery = max(0.0, self.battery - self._drain * metres)
 
     def _take_orders(self) -> None:
         try:
@@ -131,6 +202,7 @@ class Robot:
             return
         if self._mission is not None:
             return  # already on its way
+        self._wait, self._after_wait = 0.0, None  # leave the stop it was at
         self._mission = self._plant.stop_for("XV-104")
         forward = self._route.ahead(self.s, self._mission.s)
         backward = self._route.ahead(self._mission.s, self.s)
@@ -147,6 +219,13 @@ class Robot:
         if self._mission is stop:
             self.state = "actuando"
             self._hold(self._action_s, self._finish_mission)
+            return
+        if stop.action == "carga":
+            if self.battery < self._charge_below:
+                self.state = "cargando"
+                log.info("battery at %.0f %%: charging", self.battery)
+            else:
+                self._carry_on()
             return
         if stop.action == "foto":
             self.state = "inspeccionando"
@@ -194,6 +273,10 @@ class Robot:
         image = f"IMG_{self._photos:04d}"
         extra = {"poi": device, "image_url": self._world.photo(device)}
         self._publish(uns.ROBOT_PHOTO, Message(image, source="robot-01", extra=extra), False)
+        # The last photo of each point stays in the UNS (retained), so whoever arrives
+        # late (a console, a person) can still see what the robot saw there.
+        last = Message(image, source="robot-01", extra=extra)
+        self._publish(f"{uns.ROBOT_LAST_PHOTO}/{device.lower()}", last, True)
 
     def _report_valve(self) -> None:
         state = "cerrada" if self._world.valve_closed() else "abierta"
@@ -213,6 +296,8 @@ class Robot:
             "x": round(x, 2),
             "y": round(y, 2),
             "rumbo": round(heading, 1),
+            "velocidad": round(self.v, 2),
+            "bateria": round(self.battery, 1),
             "destino": target.device if target else None,
         }
         self._publish(uns.ROBOT_POSE, Message(self.state, source="robot-01", extra=extra), True)
@@ -223,13 +308,20 @@ def main() -> int:
 
     setup_logging()
     bus = Bus("robot-01")
+    world_url = os.environ.get("WORLD_URL", "http://localhost:8080")
+    port = int(os.environ.get("ROBOT_HTTP_PORT", "8081"))
+    plant = load_plant()
+    serve_photos(world_url, plant, port)
     robot = Robot(
-        HttpWorld(os.environ.get("WORLD_URL", "http://localhost:8080")),
-        load_plant(),
+        HttpWorld(world_url, os.environ.get("ROBOT_URL", f"http://localhost:{port}")),
+        plant,
         publish=lambda topic, message, retain: bus.publish(topic, message, retain=retain),
         speed=float(os.environ.get("ROBOT_SPEED", "1.5")),
         dwell_s=float(os.environ.get("ROBOT_DWELL_S", "3")),
         action_s=float(os.environ.get("ROBOT_ACTION_S", "4")),
+        accel=float(os.environ.get("ROBOT_ACCEL", "0.6")),
+        charge_rate=float(os.environ.get("ROBOT_CHARGE_RATE", "3")),
+        charge_below=float(os.environ.get("ROBOT_CHARGE_BELOW", "60")),
     )
     bus.subscribe(uns.XV_104_ORDER, robot.on_order, retained=False)
     stop = stop_on_signal()

@@ -29,7 +29,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT time, 'Alarma confirmada: visión y PLC por encima de 6 bar' AS text FROM events WHERE topic = 'planta1/exterior/reglas/sobrepresion-linea-104' AND value = 'activa' AND $__timeFilter(time)"
+          "rawSql": "SELECT time, 'Alarma confirmada: visión y PLC por encima de 6 bar' AS text FROM events WHERE topic = 'planta1/reglas/sobrepresion-linea-104' AND value = 'activa' AND $__timeFilter(time)"
         }
       }
     ]
@@ -307,7 +307,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT time, value AS \"Regla sobrepresión\" FROM events WHERE topic = 'planta1/exterior/reglas/sobrepresion-linea-104' AND $__timeFilter(time) ORDER BY time"
+          "rawSql": "SELECT time, value AS \"Regla sobrepresión\" FROM events WHERE topic = 'planta1/reglas/sobrepresion-linea-104' AND $__timeFilter(time) ORDER BY time"
         },
         {
           "refId": "B",
@@ -392,6 +392,287 @@
           "format": "table",
           "rawQuery": true,
           "rawSql": "SELECT time AS \"hora\", topic, value AS \"valor\" FROM events WHERE topic NOT LIKE 'planta1/servicios/%' AND $__timeFilter(time) ORDER BY time DESC LIMIT 20"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "hora"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Caudal FT-104",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescale"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 17
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescale"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time, value AS \"FT-104\" FROM measurements WHERE topic = 'planta1/exterior/ft-104/caudal' AND $__timeFilter(time) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 3.5,
+          "max": 7.5,
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Nivel T-101",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescale"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 17
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescale"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time, value AS \"LT-101\" FROM measurements WHERE topic = 'planta1/tanques/lt-101/nivel' AND $__timeFilter(time) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 3.5,
+          "max": 7.5,
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Corriente motor P-104",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescale"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 17
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescale"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time, value AS \"P-104\" FROM measurements WHERE topic = 'planta1/tanques/p-104/corriente' AND $__timeFilter(time) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "amp",
+          "min": 3.5,
+          "max": 7.5,
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Temperatura TT-104",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescale"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescale"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time, value AS \"TT-104\" FROM measurements WHERE topic = 'planta1/exterior/tt-104/temperatura' AND $__timeFilter(time) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "min": 3.5,
+          "max": 7.5,
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Ronda del robot: última lectura de cada punto",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "timescale"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "timescale"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DISTINCT ON (topic) time AS \"hora\", payload->>'poi' AS \"punto\", value AS \"lectura\", payload->>'quality' AS \"calidad\", payload->>'status_reason' AS \"motivo\" FROM events WHERE topic LIKE '%/inspeccion' ORDER BY topic, time DESC"
         }
       ],
       "fieldConfig": {

@@ -1,0 +1,74 @@
+# Who may read and write what in the UNS. Least privilege: each service writes only
+# the topics it owns and reads only what it needs. Anything else is silently dropped
+# by the broker (a denied publish never reaches anybody).
+#
+# %u is the user name. Every service may announce itself under planta1/servicios/<user>.
+
+pattern write planta1/servicios/%u
+pattern write planta1/servicios/%u/#
+
+# PLC gateway: publishes the PLC tags, reads nothing. It cannot send orders.
+user plc-gateway
+topic write planta1/exterior/pt-104/#
+topic write planta1/exterior/ft-104/#
+topic write planta1/exterior/tt-104/#
+topic write planta1/tanques/#
+
+# Robot: its own branch and what it checks on the valve. Reads only its orders.
+user robot-01
+topic write planta1/robots/robot-01/#
+topic write planta1/exterior/xv-104/estado
+topic read planta1/exterior/xv-104/orden
+
+# Vision: reads the robots' photos, publishes what it read on each point of interest.
+user inspector
+topic read planta1/robots/+/foto
+topic write planta1/exterior/pi-104/presion
+topic write planta1/exterior/pi-104/presion/inspeccion
+topic write planta1/exterior/ext-12/estado
+topic write planta1/exterior/ext-12/estado/inspeccion
+topic write planta1/control/ext-14/estado
+topic write planta1/control/ext-14/estado/inspeccion
+topic write planta1/subestacion/tr-1/presion
+topic write planta1/subestacion/tr-1/presion/inspeccion
+topic write planta1/calderas/pi-201/presion
+topic write planta1/calderas/pi-201/presion/inspeccion
+topic write planta1/auxiliares/pi-610/presion
+topic write planta1/auxiliares/pi-610/presion/inspeccion
+topic write planta1/taller/pi-402/presion
+topic write planta1/taller/pi-402/presion/inspeccion
+
+# Rules: read everything, write alarms and the only order there is. It takes new rules
+# from the console on .../rules/config/set.
+user rules
+topic read planta1/#
+topic write planta1/reglas/#
+topic write planta1/exterior/xv-104/orden
+
+# Historian: reads everything, writes nothing but its status.
+user historian
+topic read planta1/#
+
+# Simulator bridge (demo only): the scenario, and the disturbance button.
+user simulador
+topic write planta1/simulacion/escenario
+topic write planta1/simulacion/perturbacion/resultado
+topic read planta1/simulacion/perturbacion
+
+# Console: reads everything and the broker's statistics. It can write exactly two
+# things: new rules (the engine validates them) and the demo's disturbance button.
+# It cannot send an order to the plant, not even by mistake.
+user console
+topic read planta1/#
+topic read $SYS/#
+topic write planta1/servicios/rules/config/set
+topic write planta1/simulacion/perturbacion
+
+# docker compose run --rm tree
+user tree
+topic read planta1/#
+
+# For people: read-only, e.g. MQTT Explorer on localhost:1883
+user explorer
+topic read planta1/#
+topic read $SYS/#
