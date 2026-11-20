@@ -4,7 +4,7 @@ datasources:
     uid: timescale
     type: grafana-postgresql-datasource
     url: timescaledb:5432
-    user: grafana  # read-only (config/timescaledb/10-grafana-readonly.sh)
+    user: grafana  # read-only, created by the historian
     secureJsonData:
       password: $GRAFANA_DB_PASSWORD
     jsonData:

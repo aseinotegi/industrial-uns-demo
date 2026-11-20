@@ -343,7 +343,18 @@ class Camera:
         return self._rng.choice(current)
 
     def credits(self) -> dict[str, dict[str, str]]:
-        return {p.file: {"autor": p.author, "licencia": p.license, "fuente": p.source} for p in self.photos}
+        """Every photo with its credit and its true value (what a perfect reading would say)."""
+        return {
+            p.file: {
+                "autor": p.author,
+                "licencia": p.license,
+                "fuente": p.source,
+                "poi": p.poi,
+                "valor": p.value,
+                "condicion": p.condition,
+            }
+            for p in self.photos
+        }
 
     def read(self, file: str) -> bytes:
         if file not in self._by_file:  # only files listed in the dataset, never a path

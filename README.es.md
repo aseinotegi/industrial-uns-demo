@@ -185,7 +185,7 @@ scripts/        prueba de punta a punta (la usa el CI), generador del dataset
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                  # 89 tests, sin broker ni base de datos
+pytest -q                  # 91 tests, sin broker ni base de datos
 ./scripts/smoke-test.sh    # todo el stack en Docker, comprobado de punta a punta
 ```
 

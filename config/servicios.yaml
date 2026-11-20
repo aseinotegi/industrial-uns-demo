@@ -1,0 +1,17 @@
+# The containers of the demo, for the console's architecture page. The console checks
+# each one from where it stands, without the Docker socket: name resolution and a TCP
+# connection on the networks it shares, and the service's own signal in the UNS.
+# A service on a network the console is not in (campo, datos) cannot be resolved from
+# it: that is the segmentation working, and its health comes from the UNS only.
+
+- { nombre: broker,      imagen: eclipse-mosquitto:2,            redes: [uns],             puertos: ["1883/tcp mqtt (127.0.0.1)"], tcp: "broker:1883" }
+- { nombre: world,       imagen: industrial-uns-demo,            redes: [campo],           puertos: ["1102/tcp s7", "8080/tcp http"], uns: planta1/simulacion/escenario, max_age_s: 10 }
+- { nombre: plc-gateway, imagen: plc-mqtt-gateway,               redes: [campo, uns],                                               uns: planta1/servicios/plc-gateway/status }
+- { nombre: robot,       imagen: industrial-uns-demo,            redes: [campo, uns],      puertos: ["8081/tcp http"],            tcp: "robot:8081", uns: planta1/servicios/robot-01 }
+- { nombre: simulador,   imagen: industrial-uns-demo,            redes: [campo, uns],                                               uns: planta1/servicios/simulador }
+- { nombre: inspector,   imagen: poi-vision-inspector,           redes: [uns],                                                      uns: planta1/servicios/inspector }
+- { nombre: rules,       imagen: industrial-uns-demo,            redes: [uns],                                                      uns: planta1/servicios/rules }
+- { nombre: historian,   imagen: industrial-uns-demo,            redes: [uns, datos],                                               uns: planta1/servicios/historian }
+- { nombre: timescaledb, imagen: timescale/timescaledb:2.17.2-pg16, redes: [datos],        puertos: ["5432/tcp sql"],             uns: planta1/servicios/historian/db, max_age_s: 15 }
+- { nombre: grafana,     imagen: grafana/grafana-oss:11.3.0,     redes: [datos, publica],  puertos: ["3000/tcp http (publicado)"], tcp: "grafana:3000" }
+- { nombre: console,     imagen: plant-console,                  redes: [uns, publica],    puertos: ["8000/tcp http (publicado)"], tcp: "localhost:8000" }

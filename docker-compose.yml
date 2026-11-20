@@ -45,8 +45,8 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        cp /mosquitto/config/passwords /tmp/mosquitto-passwd &&
-        cp /mosquitto/config/acl /tmp/mosquitto-acl &&
+        tr -d '\r' < /mosquitto/config/passwords > /tmp/mosquitto-passwd &&
+        tr -d '\r' < /mosquitto/config/acl > /tmp/mosquitto-acl &&
         chmod 0700 /tmp/mosquitto-passwd /tmp/mosquitto-acl &&
         mosquitto_passwd -U /tmp/mosquitto-passwd &&
         exec mosquitto -c /mosquitto/config/mosquitto.conf
@@ -161,6 +161,7 @@ services:
       MQTT_USERNAME: historian
       MQTT_PASSWORD: demo-historian
       DATABASE_URL: postgresql://uns:${DB_PASSWORD:-demo-uns}@timescaledb:5432/uns
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}  # it creates Grafana's read-only user
     networks: [uns, datos]
 
   timescaledb:
@@ -171,9 +172,6 @@ services:
       POSTGRES_USER: uns
       POSTGRES_PASSWORD: ${DB_PASSWORD:-demo-uns}
       POSTGRES_DB: uns
-      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}  # read-only user for Grafana
-    volumes:
-      - ./config/timescaledb:/docker-entrypoint-initdb.d:ro
     networks: [datos]
 
   grafana:
@@ -210,6 +208,9 @@ services:
       MQTT_PASSWORD: demo-console
       ROBOT_URL: http://robot:8081
       GRAFANA_URL: ${GRAFANA_URL:-}   # as the browser sees it; empty: same host, port 3000
+      SERVICES_FILE: /app/config/servicios.yaml
+    volumes:
+      - ./config/servicios.yaml:/app/config/servicios.yaml:ro
     ports: ["8000:8000"]
     networks: [uns, publica]
 

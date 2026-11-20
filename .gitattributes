@@ -1,0 +1,4 @@
+# Config files are read inside Linux containers: always LF, also on a Windows checkout.
+* text=auto eol=lf
+*.jpg binary
+*.png binary

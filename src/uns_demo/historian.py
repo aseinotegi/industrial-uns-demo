@@ -7,6 +7,11 @@
 Rows are written in batches (every second or every 500 rows), so a burst of values
 costs one transaction, not hundreds. The schema is created on start. With
 TimescaleDB both tables become hypertables; on plain PostgreSQL it still works.
+
+It also creates the read-only database user Grafana uses (GRAFANA_DB_PASSWORD): only
+SELECT, so a dashboard can never change the history. And it tells the UNS whether the
+database answers (``planta1/servicios/historian/db``), which sits on a network nobody
+else on the plant network can reach.
 """
 
 from __future__ import annotations
@@ -73,7 +78,7 @@ class Historian:
         self._lock = threading.Lock()
         self._conn = None
 
-    def setup(self) -> None:
+    def setup(self, reader_password: str | None = None) -> None:
         conn = self._connection()
         with conn.cursor() as cur:
             for statement in SCHEMA:
@@ -86,7 +91,33 @@ class Historian:
                 log.info("TimescaleDB hypertables ready")
             else:
                 log.info("plain PostgreSQL (no TimescaleDB): regular tables")
+            if reader_password:
+                self._reader(cur, reader_password)
         conn.commit()
+
+    @staticmethod
+    def _reader(cur, password: str, role: str = "grafana") -> None:
+        """A user that can read the history and nothing else."""
+        from psycopg import sql
+
+        cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
+        verb = "ALTER" if cur.fetchone() else "CREATE"
+        name = sql.Identifier(role)
+        cur.execute(sql.SQL(verb + " ROLE {} LOGIN PASSWORD {}").format(name, sql.Literal(password)))
+        cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(name))
+        cur.execute(sql.SQL("GRANT SELECT ON measurements, events TO {}").format(name))
+        future = "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}"
+        cur.execute(sql.SQL(future).format(name))
+        log.info("read-only database user '%s' ready", role)
+
+    def ping(self) -> bool:
+        try:
+            with self._connection().cursor() as cur:
+                cur.execute("SELECT 1")
+            return True
+        except Exception:  # noqa: BLE001 - any driver error means: not reachable now
+            self._conn = None
+            return False
 
     def add(self, topic: str, message: Message) -> None:
         if topic in NOT_STORED or topic.startswith(uns.SIMULATION):
@@ -128,9 +159,14 @@ class Historian:
             return 0
         return count
 
-    def run(self, stop: threading.Event) -> None:
+    def run(self, stop: threading.Event, health=None, health_s: float = 5.0) -> None:
+        last = 0.0
         while not stop.wait(self._flush_s):
             self.flush()
+            last += self._flush_s
+            if health and last >= health_s:
+                last = 0.0
+                health(self.ping())
         self.flush()
 
     def _connection(self):
@@ -150,7 +186,7 @@ def main() -> int:
     stop = stop_on_signal()
     while True:  # the database may still be starting
         try:
-            historian.setup()
+            historian.setup(os.environ.get("GRAFANA_DB_PASSWORD"))
             break
         except psycopg.OperationalError as exc:
             log.info("waiting for the database: %s", str(exc).splitlines()[0])
@@ -163,7 +199,11 @@ def main() -> int:
     bus.start()
     started = datetime.now().isoformat(timespec="seconds")
     log.info("storing %s/# since %s", uns.SITE, started)
-    historian.run(stop)
+
+    def health(ok: bool) -> None:
+        bus.publish(f"{uns.SERVICES}/historian/db", Message("ok" if ok else "sin-conexion"), True)
+
+    historian.run(stop, health)
     bus.stop()
     return 0
 

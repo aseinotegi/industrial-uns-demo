@@ -25,6 +25,14 @@ for _ in $(seq 1 60); do
     curl -fsS http://localhost:8000/api/uns | grep -q '"planta1/robots/robot-01/posicion"' && echo "✓ console sees the robot moving"
     curl -fsS http://localhost:8000/ | grep -q '<div id="root">' && echo "✓ console web app served"
     curl -fsS http://localhost:8000/api/planta | grep -q '"ruta"' && echo "✓ console gets the map from the robot"
+    curl -fsS http://localhost:8000/api/servicios | python3 -c '
+import json, sys
+services = {s["nombre"]: s for s in json.load(sys.stdin)["servicios"]}
+for name, s in services.items():
+    print("  %-10s %-12s %s" % (s["estado"], name, ",".join(s["ips"]) or "aislada"))
+assert not services["world"]["visible"] and not services["timescaledb"]["visible"], "segmentation broken"
+assert services["broker"]["estado"] == "ok", "broker not reachable from the console"
+' && echo "✓ from the console, the PLC and the database are not reachable (segmentation)"
 
     # -- security ------------------------------------------------------------
     if mqtt mosquitto_sub -t 'planta1/#' -C 1 -W 3 > /dev/null 2>&1; then

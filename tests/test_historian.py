@@ -100,3 +100,32 @@ def test_the_robot_position_and_the_scenario_are_not_stored():
     historian.add(uns.ROBOT_POSE, Message("en-ruta"))
     historian.add(uns.SIM_SCENARIO, Message(12.0))
     assert historian._rows == {"measurements": [], "events": []}
+
+
+class Recorder:
+    """A cursor that records what it is asked to run."""
+
+    def __init__(self, existing=False):
+        self.sql = []
+        self.existing = existing
+
+    def execute(self, statement, params=None):
+        self.sql.append(repr(statement))
+
+    def fetchone(self):
+        return (1,) if self.existing else None
+
+
+def test_grafana_gets_a_user_that_can_only_read():
+    cur = Recorder()
+    Historian._reader(cur, "s3cret")
+    text = " ".join(cur.sql)
+    assert "CREATE ROLE" in text and "s3cret" in text
+    assert "GRANT SELECT ON measurements, events" in text
+    assert "INSERT" not in text and "DELETE" not in text and "UPDATE" not in text
+
+
+def test_an_existing_reader_gets_its_password_updated_not_recreated():
+    cur = Recorder(existing=True)
+    Historian._reader(cur, "new")
+    assert "ALTER ROLE" in " ".join(cur.sql)

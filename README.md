@@ -185,7 +185,7 @@ scripts/        end-to-end smoke test (used by CI), dataset builder
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                  # 89 tests, no broker or database needed
+pytest -q                  # 91 tests, no broker or database needed
 ./scripts/smoke-test.sh    # the whole stack in Docker, checked end to end
 ```
 
