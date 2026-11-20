@@ -4,23 +4,31 @@ It owns the truth that the other services can only observe:
 
 * the line pressure, measured twice: by transmitter PT-104 (wired to the PLC) and
   by local gauge PI-104 (a dial with no signal; only a photo can read it);
-* manual valve XV-104, which only the robot can close.
+* manual valve XV-104, which only the robot can close;
+* fire extinguisher EXT-12, on the robot's round too.
 
 It exposes them the way a real plant would:
 
 * a Siemens S7 PLC (DB1) for the gateway to read, on port 1102;
 * a tiny HTTP API standing in for the physical world: the robot's camera "looks"
-  at the gauge (``GET /gauges/pi-104``) and its arm turns the valve
-  (``POST /valves/xv-104``).
+  at a point of interest (``GET /camera/pi-104``) and gets one of the dataset photos,
+  and its arm turns the valve (``POST /valves/xv-104/close``).
 
-Scenario, repeated every ``cycle_s`` seconds: an upstream disturbance pushes the
-pressure from 4.2 towards 6.8 bar. Closing XV-104 brings it back down. Near the end
-of the cycle an operator reopens the valve, ready for the next round.
+Both come from ``dataset/``, so the demo is repeatable and easy to change:
+
+* ``dataset/plc/linea-104.csv``: the line pressure over one cycle while XV-104 is
+  open (an upstream disturbance from 4.2 up to 6.8 bar and back). Closing the valve
+  brings it down to normal; near the end of the cycle an operator reopens it.
+* ``dataset/fotos.csv``: the photos and their true values. The camera picks the
+  photo of PI-104 closest to what the dial shows right now, so the photo and the PLC
+  always tell the same story. Now and then it is the blurred or glared one.
 """
 
 from __future__ import annotations
 
 import argparse
+import bisect
+import csv
 import json
 import logging
 import math
@@ -31,35 +39,77 @@ import threading
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 log = logging.getLogger("world")
 
 NORMAL_BAR = 4.2
-PEAK_BAR = 6.8
 PLC_ALARM_BAR = 6.0  # the PLC's own high-pressure bit
+
+
+def default_dataset() -> Path:
+    if os.environ.get("DATASET_DIR"):
+        return Path(os.environ["DATASET_DIR"])
+    return Path(__file__).resolve().parents[2] / "dataset"
+
+
+# -- the line ------------------------------------------------------------------
+
+
+class Profile:
+    """Line pressure over one cycle with the valve open, from a CSV (t_s, bar)."""
+
+    def __init__(self, points: list[tuple[float, float]]) -> None:
+        if len(points) < 2:
+            raise ValueError("a pressure profile needs at least two points")
+        self._t = [t for t, _ in points]
+        self._bar = [bar for _, bar in points]
+
+    @classmethod
+    def load(cls, path: Path, time_scale: float = 1.0) -> Profile:
+        with path.open(encoding="utf-8") as f:
+            points = [(float(row["t_s"]) * time_scale, float(row["bar"])) for row in csv.DictReader(f)]
+        return cls(sorted(points))
+
+    @property
+    def cycle_s(self) -> float:
+        return self._t[-1]
+
+    def at(self, t: float) -> float:
+        """Linear interpolation between the points of the profile."""
+        i = bisect.bisect_right(self._t, t)
+        if i == 0:
+            return self._bar[0]
+        if i == len(self._t):
+            return self._bar[-1]
+        t0, t1 = self._t[i - 1], self._t[i]
+        b0, b1 = self._bar[i - 1], self._bar[i]
+        return b0 + (b1 - b0) * (t - t0) / (t1 - t0)
 
 
 @dataclass
 class Scenario:
-    cycle_s: float = 180.0
-    disturbance_at_s: float = 40.0  # when the upstream disturbance starts
-    rise_s: float = 20.0  # time to go from normal to peak
-    disturbance_ends_s: float = 150.0  # it fades on its own if nobody acts
-    reopen_at_s: float = 170.0  # operator reopens XV-104
+    profile: Profile
+    reopen_at_s: float = 170.0  # operator reopens XV-104, ready for the next cycle
     decay_s: float = 6.0  # time constant once the valve is closed
+    follow_s: float = 1.0  # how closely the line follows the profile
 
     @classmethod
-    def from_env(cls) -> Scenario:
+    def from_env(cls, dataset: Path | None = None) -> Scenario:
         scale = float(os.environ.get("WORLD_TIME_SCALE", "1"))  # < 1 runs the story faster
-        base = cls()
-        return cls(**{k: v * scale for k, v in base.__dict__.items()})
+        profile = Profile.load((dataset or default_dataset()) / "plc" / "linea-104.csv", scale)
+        return cls(profile, reopen_at_s=170.0 * scale, decay_s=6.0 * scale, follow_s=1.0 * scale)
+
+    @property
+    def cycle_s(self) -> float:
+        return self.profile.cycle_s
 
 
 class Line:
     """Pressure of the line around PT-104 / PI-104 and position of XV-104."""
 
-    def __init__(self, scenario: Scenario | None = None, seed: int | None = None) -> None:
-        self.scenario = scenario or Scenario()
+    def __init__(self, scenario: Scenario, seed: int | None = None) -> None:
+        self.scenario = scenario
         self.pressure = NORMAL_BAR
         self.valve_closed = False
         self._rng = random.Random(seed)
@@ -73,11 +123,10 @@ class Line:
             if self.valve_closed and phase >= sc.reopen_at_s:
                 self.valve_closed = False
                 log.info("operator reopened XV-104")
-            disturbed = sc.disturbance_at_s <= phase < sc.disturbance_ends_s
-            if self.valve_closed or not disturbed:
+            if self.valve_closed:
                 target, tau = NORMAL_BAR, sc.decay_s
             else:
-                target, tau = PEAK_BAR, sc.rise_s / 3
+                target, tau = sc.profile.at(phase), sc.follow_s
             self.pressure += (target - self.pressure) * (1 - math.exp(-dt / tau))
 
     def close_valve(self) -> bool:
@@ -93,6 +142,74 @@ class Line:
     def gauge(self) -> float:
         """PI-104: what the dial shows. Same line, slightly different instrument."""
         return round(self.pressure + 0.08 + self._rng.gauss(0, 0.02), 3)
+
+
+# -- the camera ----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Photo:
+    file: str
+    poi: str
+    value: str
+    condition: str
+
+
+class Camera:
+    """What the robot's camera sees at each point of interest, from the dataset."""
+
+    def __init__(
+        self, dataset: Path, seed: int | None = None, trouble_rate: float = 0.25, hold_rounds: int = 8
+    ) -> None:
+        self.folder = dataset / "fotos"
+        with (dataset / "fotos.csv").open(encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        self.photos = [Photo(r["archivo"], r["poi"], r["valor"], r["condicion"]) for r in rows]
+        self._by_file = {p.file: p for p in self.photos}
+        self._rng = random.Random(seed)
+        self._trouble_rate = trouble_rate
+        self._hold_rounds = hold_rounds
+        self._state: dict[str, tuple[list[Photo], int]] = {}  # poi -> (photos of its state, rounds left)
+
+    def pois(self) -> list[str]:
+        return sorted({p.poi for p in self.photos})
+
+    def shoot(self, poi: str, line: Line) -> Photo:
+        photos = [p for p in self.photos if p.poi == poi.upper()]
+        if not photos:
+            raise KeyError(poi)
+        if poi.upper() == "PI-104":
+            return self._gauge(photos, line.gauge())
+        return self._state_photo(poi.upper(), photos)
+
+    def _gauge(self, photos: list[Photo], dial: float) -> Photo:
+        nearest = min({float(p.value) for p in photos}, key=lambda v: abs(v - dial))
+        same = [p for p in photos if float(p.value) == nearest]
+        troubled = [p for p in same if p.condition != "limpia"]
+        if troubled and self._rng.random() < self._trouble_rate:
+            return self._rng.choice(troubled)
+        clean = [p for p in same if p.condition == "limpia"] or same
+        return clean[0]
+
+    def _state_photo(self, poi: str, photos: list[Photo]) -> Photo:
+        # An extinguisher does not change every round: it is fine for a while, and when
+        # something is wrong (missing, low pressure) it stays wrong for some rounds too.
+        current, left = self._state.get(poi, ([], 0))
+        if left <= 0:
+            ok = [p for p in photos if p.value == "OK"]
+            wrong = [p for p in photos if p.value != "OK"]
+            if ok and (not wrong or self._rng.random() > self._trouble_rate):
+                current = ok
+            else:
+                current = [self._rng.choice(wrong)]
+            left = self._hold_rounds
+        self._state[poi] = (current, left - 1)
+        return self._rng.choice(current)
+
+    def read(self, file: str) -> bytes:
+        if file not in self._by_file:  # only files listed in the dataset, never a path
+            raise KeyError(file)
+        return (self.folder / file).read_bytes()
 
 
 # -- the PLC -------------------------------------------------------------------
@@ -125,7 +242,7 @@ def serve_plc(line: Line, port: int, stop: threading.Event) -> None:
 # -- the physical world as seen by the robot -----------------------------------
 
 
-def make_handler(line: Line) -> type[BaseHTTPRequestHandler]:
+def make_handler(line: Line, camera: Camera) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code: int, body: dict) -> None:
             data = json.dumps(body).encode()
@@ -135,9 +252,29 @@ def make_handler(line: Line) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(data)
 
+        def _send_photo(self, file: str) -> None:
+            try:
+                data = camera.read(file)
+            except KeyError:
+                self._send(404, {"error": "unknown photo"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self) -> None:  # noqa: N802 (http.server naming)
-            if self.path == "/gauges/pi-104":
-                self._send(200, {"device": "PI-104", "pressure": line.gauge(), "unit": "bar"})
+            if self.path.startswith("/camera/"):
+                poi = self.path.removeprefix("/camera/")
+                try:
+                    photo = camera.shoot(poi, line)
+                except KeyError:
+                    self._send(404, {"error": "unknown point of interest"})
+                    return
+                self._send(200, {"poi": photo.poi, "photo": photo.file})
+            elif self.path.startswith("/fotos/"):
+                self._send_photo(self.path.removeprefix("/fotos/"))
             elif self.path == "/valves/xv-104":
                 self._send(200, {"device": "XV-104", "closed": line.valve_closed})
             else:
@@ -161,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
     from .bus import setup_logging, stop_on_signal
 
     parser = argparse.ArgumentParser(
-        prog="uns-world", description="Simulated plant: PLC + gauge + manual valve"
+        prog="uns-world", description="Simulated plant: PLC, gauge, manual valve and extinguisher"
     )
     parser.add_argument("--plc-port", type=int, default=1102)
     parser.add_argument("--http-port", type=int, default=8080)
@@ -169,11 +306,13 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging()
 
     stop = stop_on_signal()
-    line = Line(Scenario.from_env())
-    http = ThreadingHTTPServer(("0.0.0.0", args.http_port), make_handler(line))
+    dataset = default_dataset()
+    line = Line(Scenario.from_env(dataset))
+    camera = Camera(dataset)
+    http = ThreadingHTTPServer(("0.0.0.0", args.http_port), make_handler(line, camera))
     threading.Thread(target=http.serve_forever, daemon=True).start()
     threading.Thread(target=serve_plc, args=(line, args.plc_port, stop), daemon=True).start()
-    log.info("world API on port %d", args.http_port)
+    log.info("world API on port %d, %d photos in the dataset", args.http_port, len(camera.photos))
 
     start = last = time.monotonic()
     while not stop.wait(0.1):

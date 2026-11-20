@@ -8,6 +8,7 @@ from uns_demo.uns import Message
 
 RULES_FILE = Path(__file__).resolve().parents[1] / "config" / "rules.yaml"
 ALARM = f"{uns.RULES}/sobrepresion-linea-104"
+EXT_12 = "planta1/exterior/ext-12/estado"
 
 
 class Clock:
@@ -38,8 +39,8 @@ def topics(outputs):
 
 def test_the_shipped_rules_file_is_valid():
     rules = load_rules(RULES_FILE)
-    assert [r.id for r in rules] == ["sobrepresion-linea-104"]
-    assert rules[0].mode == "act"
+    assert [r.id for r in rules] == ["sobrepresion-linea-104", "extintor-ext-12"]
+    assert [r.mode for r in rules] == ["act", "notify"]
 
 
 def test_fires_only_when_vision_and_plc_agree(engine):
@@ -101,6 +102,20 @@ def test_notify_mode_raises_the_alarm_without_orders():
     assert topics(out) == [f"{uns.RULES}/aviso"]
 
 
+def test_extinguisher_not_ok_raises_a_notice_and_ok_clears_it(engine):
+    eng, _ = engine
+    out = eng.on_message(EXT_12, Message("NOK", source="inspector"))
+    assert topics(out) == [f"{uns.RULES}/extintor-ext-12"] and out[0][1].value == "activa"
+    assert eng.on_message(EXT_12, Message("NOK", source="inspector")) == []  # once until cleared
+    out = eng.on_message(EXT_12, Message("OK", source="inspector"))
+    assert out[0][1].value == "normal"
+
+
+def test_an_uncertain_extinguisher_photo_does_not_raise_the_notice(engine):
+    eng, _ = engine
+    assert eng.on_message(EXT_12, Message("NOK", quality="uncertain")) == []
+
+
 def test_text_values_never_satisfy_numeric_conditions(engine):
     eng, _ = engine
     eng.on_message(uns.PT_104, plc(6.7))
@@ -109,7 +124,7 @@ def test_text_values_never_satisfy_numeric_conditions(engine):
 
 def test_subscribes_only_to_the_topics_it_needs(engine):
     eng, _ = engine
-    assert eng.topics == {uns.PI_104, uns.PT_104}
+    assert eng.topics == {uns.PI_104, uns.PT_104, EXT_12}
 
 
 @pytest.mark.parametrize(
@@ -120,6 +135,7 @@ def test_subscribes_only_to_the_topics_it_needs(engine):
         ({"id": "r", "mode": "maybe", "when": [{"topic": "a", "above": 1}], "clear_when": []}, "mode"),
         ({"id": "r", "when": [{"topic": "a", "above": 1}]}, "clear_when"),
         ({"id": "r", "when": [{"topic": "a", "above": 1, "below": 2}], "clear_when": []}, "exactly one"),
+        ({"id": "r", "when": [{"topic": "a", "equals": "x", "above": 2}], "clear_when": []}, "exactly one"),
         ({"id": "r", "when": [{"topic": "a", "abov": 1}], "clear_when": []}, "exactly one"),
         ({"id": "r", "when": [{"topic": "a", "above": 1, "age": 3}], "clear_when": []}, "unknown keys"),
     ],

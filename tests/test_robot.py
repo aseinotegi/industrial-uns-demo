@@ -7,6 +7,9 @@ class FakeWorld:
     def __init__(self):
         self.closed = False
 
+    def photo(self, poi):
+        return f"http://world:8080/fotos/{poi}.jpg"
+
     def valve_closed(self):
         return self.closed
 
@@ -22,10 +25,23 @@ def make():
     return robot, world, sent
 
 
-def test_round_takes_a_photo_and_reports_the_valve():
+def test_round_photographs_every_point_and_reports_the_valve():
     robot, _, sent = make()
     robot.inspection_round()
-    assert sent == [(uns.ROBOT_PHOTO, "IMG_0411", False), (uns.XV_104_STATE, "abierta", True)]
+    assert sent == [
+        (uns.ROBOT_PHOTO, "IMG_0411", False),
+        (uns.ROBOT_PHOTO, "IMG_0412", False),
+        (uns.XV_104_STATE, "abierta", True),
+    ]
+
+
+def test_photo_message_follows_the_inspector_contract():
+    world, sent = FakeWorld(), []
+    robot = Robot(world, publish=lambda t, m, r: sent.append(m), sleep=lambda s: None)
+    robot.inspection_round()
+    photo = sent[0]
+    assert photo.extra == {"poi": "PI-104", "image_url": "http://world:8080/fotos/pi-104.jpg"}
+    assert photo.source == "robot-01" and sent[1].extra["poi"] == "EXT-12"
 
 
 def test_close_order_runs_the_mission_and_reports_the_new_state():
@@ -46,4 +62,4 @@ def test_photo_numbers_keep_increasing():
     robot.inspection_round()
     robot.inspection_round()
     photos = [v for t, v, _ in sent if t == uns.ROBOT_PHOTO]
-    assert photos == ["IMG_0411", "IMG_0412"]
+    assert photos == ["IMG_0411", "IMG_0412", "IMG_0413", "IMG_0414"]

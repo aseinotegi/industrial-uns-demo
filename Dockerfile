@@ -8,4 +8,6 @@ RUN pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 uns
 
 COPY config ./config
+COPY dataset ./dataset
+ENV DATASET_DIR=/app/dataset
 USER uns

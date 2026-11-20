@@ -16,7 +16,7 @@ from .uns import Message
 
 
 def render(values: dict[str, Message]) -> str:
-    """Indented tree, one line per value: ``presion  6.8 bar  (vision, 98 %)``."""
+    """Indented tree, one line per value: ``presion  6.8 bar  (inspector, 98 %)``."""
     lines: list[str] = []
     # values line up in one column, whatever their depth
     column = max((2 * t.count("/") + len(t.rsplit("/", 1)[-1]) for t in values), default=0) + 2

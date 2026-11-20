@@ -1,0 +1,50 @@
+# poi-vision-inspector (github.com/aseinotegi/poi-vision-inspector) reading the robot's photos.
+# Real model: Ollama with a vision model. With Docker Desktop, the easiest is Ollama
+# installed on the PC itself (it uses the GPU) and reached from the containers:
+#   ollama pull qwen3-vl
+#   INSPECTOR_CONFIG=inspector.ollama.yaml docker compose up --build
+# POI_PROVIDER_URL and POI_PROVIDER_MODEL override url and model.
+
+provider:
+  kind: ollama
+  model: qwen3-vl
+  url: http://host.docker.internal:11434
+  think: false
+  timeout_s: 180
+  retries: 2
+
+profiles:
+  manometro:
+    kind: numeric
+    description: an analog pressure gauge (round dial with a needle and a printed scale)
+    instruction: |
+      You are an industrial inspector reading instruments from robot photos.
+      Find the pressure gauge in the photo and read where the needle tip points on the scale.
+      Read between the printed marks when the needle is between them, to one decimal.
+      If glare, blur, darkness or an obstacle hides the needle or the scale, do not guess.
+    reasons: [lectura_valida, no_legible, no_encontrado]
+    min_confidence: 0.8
+
+  # A second kind of inspection: only this block and its POI were added.
+  extintor:
+    kind: state
+    description: a portable fire extinguisher hanging on its wall bracket, under its sign
+    instruction: |
+      You are an industrial safety inspector checking fire extinguishers from robot photos.
+      Check that the extinguisher is on its bracket and that the needle of its small pressure
+      gauge is inside the green band. An empty bracket under the sign means it is missing.
+    values: [OK, NOK]
+    reasons: [correcto, ausente, presion_baja, no_legible]
+    min_confidence: 0.8
+
+pois:
+  PI-104:
+    profile: manometro
+    tag: PI-104
+    uns_topic: planta1/exterior/pi-104/presion
+    expect: { unit: bar, min: 0, max: 10, max_step: 3 }
+
+  EXT-12:
+    profile: extintor
+    tag: EXT-12
+    uns_topic: planta1/exterior/ext-12/estado

@@ -1,0 +1,132 @@
+{
+ "_nota": "Respuestas de prueba escritas desde los valores reales del dataset. No son lecturas de un modelo.",
+ "ee942b77993804654c39313cedcc23108ad2f7779a39186c0fe2a352f8ebbaef": {
+  "value": 4.0,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 4.0 bar"
+ },
+ "b300f0110f29ec216dd80d507fdadc32dd93351d1e3a26f9c4fc30cc523f8468": {
+  "value": 4.25,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 4.25 bar"
+ },
+ "a12979f4a19ea289415a7f0198c7c5aa992505d12f8ad725a614a6a1bc18c8b2": {
+  "value": 4.5,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 4.5 bar"
+ },
+ "412b0970e89d798f2a20caf941495ea7420e21c78e6b13a0408e7a44fd801b43": {
+  "value": 4.75,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 4.75 bar"
+ },
+ "de95e648634dcdac4dc59fdead65803769391e53786c8ecc744a2ebd8c21123b": {
+  "value": 5.0,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 5.0 bar"
+ },
+ "a8b80a48cef4dd3f4d1f5653a2180fb92df4ba138b1729a073d4d68538ec56c8": {
+  "value": 5.25,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 5.25 bar"
+ },
+ "659beb98f658f5555a964ba1b57e513e87dcb6283ee1bdaee778f431a0c9f975": {
+  "value": 5.5,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 5.5 bar"
+ },
+ "b4810e8ffef09cf4faaeb944d3707db45eac517f5c266f158b529893372a733c": {
+  "value": 5.75,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 5.75 bar"
+ },
+ "6994572391f22d4d71e36cc6ddb4c37e52f57282ee7a4d1f6a59c17865a6337e": {
+  "value": 6.0,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 6.0 bar"
+ },
+ "a6256011a80f50ef0a8bebdaf85e301cbc0ff046227ce1a5a7119aa12579ed8d": {
+  "value": 6.25,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 6.25 bar"
+ },
+ "0fe1292b15973301154687df7b6f2fe5bd0203831ab5e00433f1559175a16be7": {
+  "value": 6.5,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 6.5 bar"
+ },
+ "850471e7678275e02f504af6d96de1024b2ff20d34dd327d2ca05c8044d125f2": {
+  "value": 6.75,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 6.75 bar"
+ },
+ "86210e0f17ceb519073f5c7f1554b3fe4539c78924f7ac8b89ef86b887867b31": {
+  "value": 7.0,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.94,
+  "evidence": "needle at about 7.0 bar"
+ },
+ "4b4f08f400fbb4f50954c8f1503d9896d25c177e55f7497a685a6299b87692b4": {
+  "value": 5.5,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.62,
+  "evidence": "needle at about 5.5 bar"
+ },
+ "d5e8049930154349ac05a623935a51377140aea0ec468c65434bf659c19c969d": {
+  "value": null,
+  "unit": null,
+  "status_reason": "no_legible",
+  "confidence": 0.2,
+  "evidence": "the needle is blurred, the scale cannot be read"
+ },
+ "aa7b1482e6df17257d1cfa1620e14824d7135496e288e6f0b8f67e3d2f66ac97": {
+  "value": "OK",
+  "status_reason": "correcto",
+  "confidence": 0.93,
+  "evidence": "extinguisher correcto"
+ },
+ "542c995cc599fdc6f5ae788bd916e9d9af46514730f316166f893a4ce83224d6": {
+  "value": "OK",
+  "status_reason": "correcto",
+  "confidence": 0.93,
+  "evidence": "extinguisher correcto"
+ },
+ "ea0a532367da42b7c3ab855493a680af7305ddbbc2be1c9b0fc5c91f7791f84a": {
+  "value": "NOK",
+  "status_reason": "presion_baja",
+  "confidence": 0.93,
+  "evidence": "extinguisher presion baja"
+ },
+ "930bb1b0b3917b33aa4f43f42580ba8e6c6e77dfb551fbaddcdcf7a2c99d9f45": {
+  "value": "NOK",
+  "status_reason": "ausente",
+  "confidence": 0.93,
+  "evidence": "extinguisher ausente"
+ }
+}

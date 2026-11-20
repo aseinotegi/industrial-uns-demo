@@ -1,8 +1,10 @@
 """The inspection robot, simulated.
 
-* Rounds: every ``round_s`` it stops at PI-104 and takes a photo (published for the
-  vision service), then checks the position of XV-104 and reports it to the UNS.
-  A manual valve has no position switch, so the robot is the only one that knows.
+* Rounds: every ``round_s`` it stops at each point of interest (gauge PI-104 and
+  extinguisher EXT-12) and takes a photo. The photo goes to the UNS with its POI and
+  a link to the image, which is what the inspector (poi-vision-inspector) listens for.
+  Then it checks the position of XV-104 and reports it: a manual valve has no
+  position switch, so the robot is the only one that knows.
 * Orders: when the rules ask for ``cerrar`` on XV-104, it goes there, closes it with
   the arm and reports back. Orders are not retained, so a restarted robot never
   replays an old one.
@@ -24,7 +26,11 @@ from .uns import Message
 log = logging.getLogger("robot")
 
 
+ROUND = ("pi-104", "ext-12")  # points of interest, in the order the robot visits them
+
+
 class World(Protocol):
+    def photo(self, poi: str) -> str: ...  # URL of the photo the camera just took
     def valve_closed(self) -> bool: ...
     def close_valve(self) -> None: ...
 
@@ -32,6 +38,10 @@ class World(Protocol):
 class HttpWorld:
     def __init__(self, url: str) -> None:
         self._url = url
+
+    def photo(self, poi: str) -> str:
+        with urllib.request.urlopen(f"{self._url}/camera/{poi}", timeout=5) as response:
+            return f"{self._url}/fotos/{json.load(response)['photo']}"
 
     def valve_closed(self) -> bool:
         with urllib.request.urlopen(f"{self._url}/valves/xv-104", timeout=5) as response:
@@ -58,9 +68,11 @@ class Robot:
         if not self._busy.acquire(blocking=False):
             return  # on a mission; the round waits
         try:
-            self._photos += 1
-            image = f"IMG_{self._photos:04d}"
-            self._publish(uns.ROBOT_PHOTO, Message(image, extra={"point": "PI-104"}), False)
+            for poi in ROUND:
+                self._photos += 1
+                image = f"IMG_{self._photos:04d}"
+                extra = {"poi": poi.upper(), "image_url": self._world.photo(poi)}
+                self._publish(uns.ROBOT_PHOTO, Message(image, source="robot-01", extra=extra), False)
             self._report_valve()
         finally:
             self._busy.release()

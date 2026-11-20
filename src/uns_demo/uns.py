@@ -11,7 +11,7 @@ Topic names are the plant's own (Spanish, like the tags on the P&ID); code is En
 Message contract (JSON)::
 
     {"value": 6.8, "unit": "bar", "ts": "2026-11-18T10:00:00.000Z",
-     "source": "vision", "quality": "good", "confidence": 0.98}
+     "source": "inspector", "quality": "good", "confidence": 0.98}
 
 Only ``value`` is mandatory. Extra keys (``confidence``, ``image``...) are kept.
 """
@@ -39,7 +39,7 @@ def path(*levels: str) -> str:
 
 # The part of the namespace this demo uses. One place, so a typo is a failing test,
 # not a value that silently goes nowhere.
-PI_104 = path(SITE, "exterior", "pi-104", "presion")  # local gauge, read by vision
+PI_104 = path(SITE, "exterior", "pi-104", "presion")  # local gauge, read from the robot's photos
 PT_104 = path(SITE, "exterior", "pt-104", "presion")  # transmitter, read by the PLC
 XV_104_ORDER = path(SITE, "exterior", "xv-104", "orden")  # what the rules ask for
 XV_104_STATE = path(SITE, "exterior", "xv-104", "estado")  # what the robot saw / did

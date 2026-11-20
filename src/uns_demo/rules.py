@@ -44,20 +44,29 @@ class RuleError(ValueError):
     pass
 
 
+COMPARISONS = ("above", "below", "equals", "not_equals")
+
+
 @dataclass(frozen=True)
 class Condition:
     topic: str
-    threshold: float
-    compare: str  # "above" | "below"
+    threshold: object  # a number for above/below, any value for equals/not_equals
+    compare: str  # one of COMPARISONS
     max_age_s: float | None = None
     quality: str | None = None
 
     def holds(self, value: Message | None, received_at: float | None, now: float) -> bool:
-        if value is None or received_at is None or value.number is None:
+        if value is None or received_at is None:
             return False
         if self.max_age_s is not None and now - received_at > self.max_age_s:
             return False
         if self.quality is not None and value.quality != self.quality:
+            return False
+        if self.compare == "equals":
+            return value.value == self.threshold
+        if self.compare == "not_equals":
+            return value.value != self.threshold
+        if value.number is None:
             return False
         compare = operator.gt if self.compare == "above" else operator.lt
         return compare(value.number, self.threshold)
@@ -66,16 +75,20 @@ class Condition:
     def parse(cls, raw: dict, where: str) -> Condition:
         if not isinstance(raw, dict) or "topic" not in raw:
             raise RuleError(f"{where}: each condition needs a 'topic'")
-        limits = [k for k in ("above", "below") if k in raw]
+        limits = [k for k in COMPARISONS if k in raw]
         if len(limits) != 1:
-            raise RuleError(f"{where}: use exactly one of 'above' or 'below'")
-        unknown = set(raw) - {"topic", "above", "below", "max_age_s", "quality"}
+            raise RuleError(f"{where}: use exactly one of {', '.join(COMPARISONS)}")
+        unknown = set(raw) - {"topic", "max_age_s", "quality", *COMPARISONS}
         if unknown:
             raise RuleError(f"{where}: unknown keys {sorted(unknown)}")
+        compare = limits[0]
+        threshold = raw[compare]
+        if compare in ("above", "below"):
+            threshold = float(threshold)
         return cls(
             topic=str(raw["topic"]),
-            threshold=float(raw[limits[0]]),
-            compare=limits[0],
+            threshold=threshold,
+            compare=compare,
             max_age_s=float(raw["max_age_s"]) if "max_age_s" in raw else None,
             quality=raw.get("quality"),
         )

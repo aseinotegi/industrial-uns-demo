@@ -2,6 +2,10 @@
 #
 #   docker compose up --build        then open http://localhost:3000 (Grafana)
 #   docker compose run --rm tree     the whole namespace, right now
+#
+# Vision: by default the inspector answers from dataset/respuestas-de-prueba.json (no
+# model needed). With a real model (Ollama on the PC, see config/inspector.ollama.yaml):
+#   INSPECTOR_CONFIG=inspector.ollama.yaml docker compose up --build
 
 x-service: &service
   build: .
@@ -46,10 +50,20 @@ services:
     command: ["uns-robot"]
     depends_on: [broker, world]
 
-  vision:
-    <<: *service
-    command: ["uns-vision"]
+  # Reads the robot's photos with a multimodal model and publishes what it saw to the UNS.
+  inspector:
+    build: https://github.com/aseinotegi/poi-vision-inspector.git#main
+    image: poi-vision-inspector:uns-demo
+    restart: unless-stopped
     depends_on: [broker, world]
+    environment:
+      MQTT_HOST: broker
+      POI_PROVIDER_URL: ${POI_PROVIDER_URL:-}
+      POI_PROVIDER_MODEL: ${POI_PROVIDER_MODEL:-}
+    extra_hosts: ["host.docker.internal:host-gateway"]  # Ollama running on the PC
+    volumes:
+      - ./config/${INSPECTOR_CONFIG:-inspector.yaml}:/app/config/inspector.yaml:ro
+      - ./dataset/respuestas-de-prueba.json:/app/config/respuestas.json:ro
 
   rules:
     <<: *service
