@@ -32,7 +32,7 @@ rules:
   when:
   - {topic: planta1/exterior/ext-12/estado, equals: NOK, quality: good}
   clear_when:
-  - {topic: planta1/exterior/ext-12/estado, equals: OK}
+  - {topic: planta1/exterior/ext-12/estado, equals: OK, quality: good}
 
 - id: extintor-ext-14
   description: El robot ha visto el extintor EXT-14 fuera de su soporte o sin presión
@@ -40,4 +40,4 @@ rules:
   when:
   - {topic: planta1/control/ext-14/estado, equals: NOK, quality: good}
   clear_when:
-  - {topic: planta1/control/ext-14/estado, equals: OK}
+  - {topic: planta1/control/ext-14/estado, equals: OK, quality: good}

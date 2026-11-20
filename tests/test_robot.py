@@ -63,7 +63,9 @@ def test_photo_message_follows_the_inspector_contract():
     robot, _, sent = make(speed=5, dwell_s=0)
     until(robot, lambda: photos(sent))
     photo = next(m for t, m, _ in sent if t == uns.ROBOT_PHOTO)
-    assert photo.extra == {"poi": "PIV-801", "image_url": "http://world:8080/fotos/piv-801.jpg"}
+    assert photo.extra["poi"] == "PIV-801"
+    assert photo.extra["image_url"] == "http://world:8080/fotos/piv-801.jpg"
+    assert photo.extra["captured_at"] == photo.ts
     assert photo.source == "robot-01"
 
 

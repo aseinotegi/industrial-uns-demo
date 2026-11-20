@@ -271,11 +271,12 @@ class Robot:
     def _take_photo(self, device: str) -> None:
         self._photos += 1
         image = f"IMG_{self._photos:04d}"
-        extra = {"poi": device, "image_url": self._world.photo(device)}
-        self._publish(uns.ROBOT_PHOTO, Message(image, source="robot-01", extra=extra), False)
+        captured = uns.now_iso()
+        extra = {"poi": device, "image_url": self._world.photo(device), "captured_at": captured}
+        self._publish(uns.ROBOT_PHOTO, Message(image, ts=captured, source="robot-01", extra=extra), False)
         # The last photo of each point stays in the UNS (retained), so whoever arrives
         # late (a console, a person) can still see what the robot saw there.
-        last = Message(image, source="robot-01", extra=extra)
+        last = Message(image, ts=captured, source="robot-01", extra=extra)
         self._publish(f"{uns.ROBOT_LAST_PHOTO}/{device.lower()}", last, True)
 
     def _report_valve(self) -> None:

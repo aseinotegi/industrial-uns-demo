@@ -55,6 +55,10 @@ SERVICES = path(SITE, "servicios")  # online/offline of every service (Last Will
 SIMULATION = path(SITE, "simulacion")
 SIM_SCENARIO = f"{SIMULATION}/escenario"
 SIM_DISTURB = f"{SIMULATION}/perturbacion"
+# Isolated vision trials from the console: never a plant value. The request carries
+# the whole image (base64), so it is not something to keep.
+VISION_TRIAL = path(SITE, "ensayos", "vision")
+VISION_TRIAL_PHOTO = f"{VISION_TRIAL}/foto"
 
 
 def now_iso() -> str:

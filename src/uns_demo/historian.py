@@ -54,7 +54,8 @@ HYPERTABLES = [
 
 # Live-only topics: the robot's position several times a second is for the console,
 # not for the history (the photos and missions already say where it has been).
-NOT_STORED = (uns.ROBOT_POSE, uns.SIM_SCENARIO)
+# A vision trial request carries the whole image: its result is kept, the image is not.
+NOT_STORED = (uns.ROBOT_POSE, uns.SIM_SCENARIO, uns.VISION_TRIAL_PHOTO)
 
 
 def to_row(topic: str, message: Message) -> tuple[str, tuple]:

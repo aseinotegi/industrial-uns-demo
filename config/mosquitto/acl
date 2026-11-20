@@ -21,8 +21,12 @@ topic write planta1/exterior/xv-104/estado
 topic read planta1/exterior/xv-104/orden
 
 # Vision: reads the robots' photos, publishes what it read on each point of interest.
+# Trials are isolated: they never grant access to the plant's value topics.
 user inspector
 topic read planta1/robots/+/foto
+topic read planta1/ensayos/vision/foto
+topic write planta1/ensayos/vision/estado
+topic write planta1/ensayos/vision/resultado
 topic write planta1/exterior/pi-104/presion
 topic write planta1/exterior/pi-104/presion/inspeccion
 topic write planta1/exterior/ext-12/estado
@@ -55,14 +59,15 @@ topic write planta1/simulacion/escenario
 topic write planta1/simulacion/perturbacion/resultado
 topic read planta1/simulacion/perturbacion
 
-# Console: reads everything and the broker's statistics. It can write exactly two
-# things: new rules (the engine validates them) and the demo's disturbance button.
-# It cannot send an order to the plant, not even by mistake.
+# Console: reads everything and the broker's statistics. It can write exactly three
+# requests: new rules (validated by the engine), the demo disturbance and isolated
+# vision trials. It cannot send an order or overwrite a plant value.
 user console
 topic read planta1/#
 topic read $SYS/#
 topic write planta1/servicios/rules/config/set
 topic write planta1/simulacion/perturbacion
+topic write planta1/ensayos/vision/foto
 
 # docker compose run --rm tree
 user tree

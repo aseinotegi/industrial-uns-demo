@@ -68,6 +68,14 @@ def test_flush_writes_one_batch_per_table():
     assert historian.flush() == 0
 
 
+def test_a_vision_trial_image_is_not_stored_but_its_result_is():
+    db = FakeConnection()
+    historian = Historian(lambda: db)
+    historian.add(uns.VISION_TRIAL_PHOTO, Message("nueva-1", extra={"image_b64": "x" * 1000}))
+    historian.add(f"{uns.VISION_TRIAL}/resultado", Message(6.5, extra={"state": "completada"}))
+    assert historian.flush() == 1
+
+
 def test_rows_survive_a_database_outage():
     db = FakeConnection()
     historian = Historian(lambda: db)

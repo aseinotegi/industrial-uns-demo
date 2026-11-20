@@ -129,6 +129,21 @@ def test_an_uncertain_extinguisher_photo_does_not_raise_the_notice(engine):
     assert eng.on_message(EXT_12, Message("NOK", quality="uncertain")) == []
 
 
+def test_an_uncertain_ok_does_not_clear_an_extinguisher_notice(engine):
+    eng, _ = engine
+    assert eng.on_message(EXT_12, Message("NOK", source="inspector"))
+    assert eng.on_message(EXT_12, Message("OK", quality="uncertain", source="inspector")) == []
+    out = eng.on_message(EXT_12, Message("OK", quality="good", source="inspector"))
+    assert out[0][1].value == "normal"
+
+
+def test_shipped_extinguisher_rules_require_good_quality_to_clear():
+    rules = load_rules(RULES_FILE)
+    for rule in rules:
+        if rule.id.startswith("extintor-"):
+            assert all(condition.quality == "good" for condition in rule.clear_when)
+
+
 def test_text_values_never_satisfy_numeric_conditions(engine):
     eng, _ = engine
     eng.on_message(uns.PT_104, plc(6.7))
