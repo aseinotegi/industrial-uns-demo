@@ -149,3 +149,12 @@ def test_duplicated_ids_are_refused():
     rule = {"id": "r", "when": [{"topic": "a", "above": 1}], "clear_when": [{"topic": "a", "below": 0}]}
     with pytest.raises(RuleError, match="unique"):
         parse_rules({"rules": [rule, dict(rule)]})
+
+
+def test_reloading_the_rules_keeps_an_active_rule_active(engine):
+    eng, _ = engine
+    eng.on_message(uns.PT_104, plc(6.7))
+    assert topics(eng.on_message(uns.PI_104, vision(6.8))) == [ALARM, uns.XV_104_ORDER]
+    eng.replace(load_rules(RULES_FILE))  # the console saved the file
+    assert eng.on_message(uns.PI_104, vision(6.9)) == []  # no second order
+    assert topics(eng.on_message(uns.PT_104, plc(5.0))) == [ALARM]  # and it still clears

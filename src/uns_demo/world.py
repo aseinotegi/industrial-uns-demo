@@ -75,6 +75,17 @@ class Profile:
     def cycle_s(self) -> float:
         return self._t[-1]
 
+    @property
+    def rise_at(self) -> float:
+        """When the disturbance starts: the last point before the pressure leaves its first value."""
+        for i, bar in enumerate(self._bar):
+            if abs(bar - self._bar[0]) > 0.05:
+                return self._t[max(i - 1, 0)]
+        return 0.0
+
+    def points(self) -> list[list[float]]:
+        return [[t, bar] for t, bar in zip(self._t, self._bar, strict=True)]
+
     def at(self, t: float) -> float:
         """Linear interpolation between the points of the profile."""
         i = bisect.bisect_right(self._t, t)
@@ -114,11 +125,31 @@ class Line:
         self.valve_closed = False
         self._rng = random.Random(seed)
         self._lock = threading.Lock()
+        self._t = 0.0
+        self._offset = 0.0  # moves the cycle when someone asks for a disturbance now
+
+    def phase(self) -> float:
+        return (self._t + self._offset) % self.scenario.cycle_s
+
+    def disturb_now(self) -> bool:
+        """Jumps the cycle to the start of the disturbance. False while the line is still
+        above normal (one disturbance at a time)."""
+        sc = self.scenario
+        with self._lock:
+            if self.pressure > NORMAL_BAR + 0.3:
+                return False
+            self._offset += (sc.profile.rise_at - self.phase()) % sc.cycle_s
+            if self.valve_closed:
+                self.valve_closed = False
+                log.info("operator reopened XV-104 for the new disturbance")
+        log.info("upstream disturbance requested")
+        return True
 
     def step(self, t: float, dt: float) -> None:
         """Advances the physics to time ``t`` (seconds since start)."""
         sc = self.scenario
-        phase = t % sc.cycle_s
+        self._t = t
+        phase = self.phase()
         with self._lock:
             if self.valve_closed and phase >= sc.reopen_at_s:
                 self.valve_closed = False
@@ -242,7 +273,7 @@ def serve_plc(line: Line, port: int, stop: threading.Event) -> None:
 # -- the physical world as seen by the robot -----------------------------------
 
 
-def make_handler(line: Line, camera: Camera) -> type[BaseHTTPRequestHandler]:
+def make_handler(line: Line, camera: Camera, plant: dict | None = None) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code: int, body: dict) -> None:
             data = json.dumps(body).encode()
@@ -277,11 +308,30 @@ def make_handler(line: Line, camera: Camera) -> type[BaseHTTPRequestHandler]:
                 self._send_photo(self.path.removeprefix("/fotos/"))
             elif self.path == "/valves/xv-104":
                 self._send(200, {"device": "XV-104", "closed": line.valve_closed})
+            elif self.path == "/planta" and plant is not None:
+                self._send(200, plant)
+            elif self.path == "/escenario":
+                sc = line.scenario
+                self._send(
+                    200,
+                    {
+                        "fase_s": round(line.phase(), 1),
+                        "ciclo_s": sc.cycle_s,
+                        "perturbacion_s": sc.profile.rise_at,
+                        "valvula_cerrada": line.valve_closed,
+                        "perfil": sc.profile.points(),
+                    },
+                )
             else:
                 self._send(404, {"error": "unknown device"})
 
         def do_POST(self) -> None:  # noqa: N802
-            if self.path == "/valves/xv-104/close":
+            if self.path == "/escenario/perturbacion":
+                if line.disturb_now():
+                    self._send(200, {"ok": True})
+                else:
+                    self._send(409, {"ok": False, "error": "there is already a disturbance going on"})
+            elif self.path == "/valves/xv-104/close":
                 changed = line.close_valve()
                 log.info("robot closed XV-104" if changed else "XV-104 was already closed")
                 self._send(200, {"device": "XV-104", "closed": True, "changed": changed})
@@ -296,6 +346,7 @@ def make_handler(line: Line, camera: Camera) -> type[BaseHTTPRequestHandler]:
 
 def main(argv: list[str] | None = None) -> int:
     from .bus import setup_logging, stop_on_signal
+    from .plant import load_plant
 
     parser = argparse.ArgumentParser(
         prog="uns-world", description="Simulated plant: PLC, gauge, manual valve and extinguisher"
@@ -309,7 +360,8 @@ def main(argv: list[str] | None = None) -> int:
     dataset = default_dataset()
     line = Line(Scenario.from_env(dataset))
     camera = Camera(dataset)
-    http = ThreadingHTTPServer(("0.0.0.0", args.http_port), make_handler(line, camera))
+    plant = load_plant().raw
+    http = ThreadingHTTPServer(("0.0.0.0", args.http_port), make_handler(line, camera, plant))
     threading.Thread(target=http.serve_forever, daemon=True).start()
     threading.Thread(target=serve_plc, args=(line, args.plc_port, stop), daemon=True).start()
     log.info("world API on port %d, %d photos in the dataset", args.http_port, len(camera.photos))

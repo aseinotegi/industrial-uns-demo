@@ -26,6 +26,7 @@ flowchart LR
     B -- order --> R
     R -- "closes XV-104" --> W
     B --> H["historian"] --> T[("TimescaleDB")] --> GR["Grafana"]
+    B <--> C["console<br/>(plant-console)"]
 ```
 
 ## Quick start
@@ -34,9 +35,11 @@ flowchart LR
 docker compose up --build
 ```
 
-Open **http://localhost:3000** (Grafana, no login). Every three minutes the line pressure rises from 4.2 towards 6.8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). Within a minute you will see the alarm confirmed by both sources, the robot closing XV-104 and the pressure falling back.
+Open **http://localhost:8000**, the plant console ([plant-console](https://github.com/aseinotegi/plant-console)): the robot walking its route on the plant map, the PLC, the namespace, the rules (editable) and what the vision read in each photo. Grafana, with the history, is on **http://localhost:3000** (no login).
 
-Too slow for a first look? `WORLD_TIME_SCALE=0.25 ROBOT_ROUND_S=4 docker compose up --build` runs the whole story in under a minute.
+Every three minutes the line pressure rises from 4.2 towards 6.8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). Within a minute you will see the alarm confirmed by both sources, the robot closing XV-104 and the pressure falling back.
+
+Too slow for a first look? `WORLD_TIME_SCALE=0.25 ROBOT_SPEED=6 ROBOT_DWELL_S=0.75 docker compose up --build` runs the whole story in under a minute. The **Provocar sobrepresión** button in the console starts a pressure surge right away instead of waiting for the next one.
 
 The namespace, right now:
 
@@ -106,10 +109,10 @@ The photos are synthetic, made with the generator of poi-vision-inspector (`pyth
 
 ```bash
 ollama pull qwen3-vl
-INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_ROUND_S=30 docker compose up --build
+INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_DWELL_S=15 docker compose up --build
 ```
 
-A local model needs a few seconds per photo (more without a GPU), so give the robot time between rounds with `ROBOT_ROUND_S`.
+A local model needs a few seconds per photo (more without a GPU), so let the robot wait longer at each stop with `ROBOT_DWELL_S`.
 
 ## The namespace
 
@@ -127,6 +130,7 @@ One hierarchy, `site/area/device/value`, named like the plant's P&ID (in Spanish
 | `planta1/exterior/xv-104/estado` | robot | yes | `abierta` / `cerrada` |
 | `planta1/robots/robot-01/foto` | robot | no | `IMG_0412`, with `poi` and `image_url` |
 | `planta1/robots/robot-01/mision` | robot | yes | `en-camino` / `completada` |
+| `planta1/robots/robot-01/posicion` | robot | yes | `en-ruta` / `inspeccionando` / `en-mision`…, with `x`, `y`, `rumbo` (5 per second, not stored) |
 | `planta1/servicios/<service>` | each service | yes | `online` / `offline` (Last Will) |
 
 Every message follows one contract. Only `value` is mandatory, extra fields are kept:
@@ -170,11 +174,12 @@ src/uns_demo/
   uns.py        the namespace and the message contract
   bus.py        MQTT for every service: Last Will status, retained or live-only subscriptions
   world.py      simulated plant: PLC profile, S7 PLC (DB1), camera from the dataset, valve
-  robot.py      rounds and missions
+  plant.py      plant map and route geometry (config/planta.yaml)
+  robot.py      walks the route, stops, photos, missions
   rules.py      YAML rules, pure engine (messages in, messages out)
   historian.py  UNS → TimescaleDB, batched and resilient
   tree.py       prints the namespace
-config/         rules, gateway tags, inspector (replay / Ollama), broker
+config/         plant map, rules, gateway tags, inspector (replay / Ollama), broker
 dataset/        photos with their true values, PLC pressure profile, recorded answers
 grafana/        datasource and dashboard, provisioned
 scripts/        end-to-end smoke test (used by CI), dataset generator
@@ -184,7 +189,7 @@ scripts/        end-to-end smoke test (used by CI), dataset generator
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                  # 59 tests, no broker or database needed
+pytest -q                  # 72 tests, no broker or database needed
 ./scripts/smoke-test.sh    # the whole stack in Docker, checked end to end
 ```
 

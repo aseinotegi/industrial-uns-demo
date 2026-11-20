@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-export WORLD_TIME_SCALE=0.25 ROBOT_ROUND_S=4 ROBOT_TRAVEL_S=2.5
+export WORLD_TIME_SCALE=0.25 ROBOT_SPEED=6 ROBOT_DWELL_S=0.75 ROBOT_ACTION_S=1
 docker compose up -d --build
 
 sql() { docker compose exec -T timescaledb psql -U uns -d uns -tAc "$1" 2>/dev/null || true; }
@@ -19,6 +19,8 @@ for _ in $(seq 1 60); do
     echo "✓ alarm confirmed, order sent, valve closed, alarm cleared"
     echo "✓ PLC values stored: $(sql "SELECT count(*) FROM measurements WHERE topic = 'planta1/exterior/pt-104/presion'")"
     curl -fsS http://localhost:3000/api/dashboards/uid/linea-104 > /dev/null && echo "✓ Grafana dashboard provisioned"
+    curl -fsS http://localhost:8000/api/uns | grep -q '"planta1/robots/robot-01/posicion"' && echo "✓ console sees the robot moving"
+    curl -fsS http://localhost:8000/ | grep -q '<div id="root">' && echo "✓ console web app served"
     docker compose run --rm tree
     exit 0
   fi

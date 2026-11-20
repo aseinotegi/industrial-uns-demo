@@ -1,6 +1,6 @@
 # The story of andersein.com, running: robot photo → vision → UNS ← PLC → rules → robot → dashboard.
 #
-#   docker compose up --build        then open http://localhost:3000 (Grafana)
+#   docker compose up --build        then open http://localhost:8000 (console) and :3000 (Grafana)
 #   docker compose run --rm tree     the whole namespace, right now
 #
 # Vision: by default the inspector answers from dataset/respuestas-de-prueba.json (no
@@ -15,10 +15,11 @@ x-service: &service
   environment:
     MQTT_HOST: broker
     WORLD_URL: http://world:8080
-    # Speed the story up for a quick look: WORLD_TIME_SCALE=0.25 docker compose up
+    # Speed the story up for a quick look: see "Quick start" in the README
     WORLD_TIME_SCALE: ${WORLD_TIME_SCALE:-1}
-    ROBOT_ROUND_S: ${ROBOT_ROUND_S:-15}
-    ROBOT_TRAVEL_S: ${ROBOT_TRAVEL_S:-10}
+    ROBOT_SPEED: ${ROBOT_SPEED:-1.5}      # m/s along the route of config/planta.yaml
+    ROBOT_DWELL_S: ${ROBOT_DWELL_S:-3}    # time at each stop
+    ROBOT_ACTION_S: ${ROBOT_ACTION_S:-4}  # time to close the valve
 
 services:
   broker:
@@ -31,6 +32,8 @@ services:
   world:
     <<: *service
     command: ["uns-world"]
+    volumes:
+      - ./config/planta.yaml:/app/config/planta.yaml:ro
 
   # Reads the PLC and publishes PT-104 straight into its UNS path.
   plc-gateway:
@@ -49,6 +52,8 @@ services:
     <<: *service
     command: ["uns-robot"]
     depends_on: [broker, world]
+    volumes:
+      - ./config/planta.yaml:/app/config/planta.yaml:ro
 
   # Reads the robot's photos with a multimodal model and publishes what it saw to the UNS.
   inspector:
@@ -72,7 +77,25 @@ services:
       MQTT_HOST: broker
       RULES_FILE: /app/config/rules.yaml
     volumes:
-      - ./config/rules.yaml:/app/config/rules.yaml:ro
+      # read-write for the console, which edits it; the engine reloads it when it changes
+      - ./config/rules.yaml:/app/config/rules.yaml
+
+  # The plant's HMI: the robot on the map, the PLC, the namespace, the rules and the vision.
+  console:
+    build: https://github.com/aseinotegi/plant-console.git#main
+    image: plant-console:uns-demo
+    restart: unless-stopped
+    depends_on: [broker, world, rules]
+    # It edits config/rules.yaml on this machine, whoever owns the file. On Linux you can
+    # run it as yourself instead: CONSOLE_UID=$(id -u) docker compose up
+    user: "${CONSOLE_UID:-0}"
+    environment:
+      MQTT_HOST: broker
+      WORLD_URL: http://world:8080
+      RULES_FILE: /app/config/rules.yaml
+    ports: ["8000:8000"]
+    volumes:
+      - ./config/rules.yaml:/app/config/rules.yaml
 
   historian:
     <<: *service

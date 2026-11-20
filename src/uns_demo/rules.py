@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import operator
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -165,6 +166,14 @@ class RuleEngine:
     def topics(self) -> set[str]:
         return set().union(*(r.topics for r in self.rules))
 
+    def replace(self, rules: list[Rule]) -> None:
+        """New rules from an edited file. A rule that was active stays active (same id),
+        so saving the file never sends the same order twice."""
+        active = {r.id for r in self.rules if r.active}
+        for rule in rules:
+            rule.active = rule.id in active
+        self.rules = rules
+
     def on_message(self, topic: str, message: Message) -> list[Output]:
         now = self._clock()
         self._last[topic] = (message, now)
@@ -206,20 +215,52 @@ def main() -> int:
     from .bus import Bus, setup_logging, stop_on_signal
 
     setup_logging()
-    engine = RuleEngine(load_rules(os.environ.get("RULES_FILE", "config/rules.yaml")))
+    path = Path(os.environ.get("RULES_FILE", "config/rules.yaml"))
+    engine = RuleEngine(load_rules(path))
     bus = Bus("rules")
+    lock = threading.Lock()
 
     def on_value(topic: str, message: Message) -> None:
-        for out_topic, out_message, retain in engine.on_message(topic, message):
+        with lock:
+            if topic not in engine.topics:
+                return
+            outputs = engine.on_message(topic, message)
+        for out_topic, out_message, retain in outputs:
             bus.publish(out_topic, out_message, retain=retain)
 
-    # A retained value may be hours old: only live values can trigger a rule.
-    for topic in sorted(engine.topics):
-        bus.subscribe(topic, on_value, retained=False)
-    log.info("%d rules loaded, watching %d topics", len(engine.rules), len(engine.topics))
+    def announce(state: str, detail: str) -> None:
+        extra = {"rules": [r.id for r in engine.rules], "detail": detail}
+        bus.publish(f"{uns.SERVICES}/rules/config", Message(state, extra=extra), True)
+
+    # Everything under the site, filtered by the engine: an edited file can watch new
+    # topics without resubscribing. A retained value may be hours old: live values only.
+    bus.subscribe(f"{uns.SITE}/#", on_value, retained=False)
     stop = stop_on_signal()
     bus.start()
-    stop.wait()
+    log.info("%d rules loaded, watching %d topics", len(engine.rules), len(engine.topics))
+    announce("cargadas", str(path))
+
+    # The file is the source of truth: when it changes (the console saves it), reload.
+    # A broken file is refused and the rules that were running keep running.
+    seen = path.stat().st_mtime
+    while not stop.wait(2):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime == seen:
+            continue
+        seen = mtime
+        try:
+            rules = load_rules(path)
+        except (RuleError, yaml.YAMLError, OSError) as exc:
+            log.error("rules file not reloaded, keeping the previous rules: %s", exc)
+            announce("error", str(exc))
+            continue
+        with lock:
+            engine.replace(rules)
+        log.info("rules reloaded: %d rules, %d topics", len(rules), len(engine.topics))
+        announce("recargadas", f"{len(rules)} reglas")
     bus.stop()
     return 0
 

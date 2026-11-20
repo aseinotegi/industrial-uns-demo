@@ -47,6 +47,7 @@ RULES = path(SITE, "exterior", "reglas")  # one subtopic per rule
 ROBOT = path(SITE, "robots", "robot-01")
 ROBOT_PHOTO = f"{ROBOT}/foto"
 ROBOT_MISSION = f"{ROBOT}/mision"
+ROBOT_POSE = f"{ROBOT}/posicion"  # x, y, heading and state, several times a second
 SERVICES = path(SITE, "servicios")  # online/offline of every service (Last Will)
 
 

@@ -1,0 +1,41 @@
+# Map of the plant, in metres (x to the right, y down, as on a drawing).
+#
+# The robot walks `ruta` in a loop, starting at the charging base, and stops at each
+# `paradas` point: photo of a point of interest or check of a valve. The console draws
+# the same file, so what you see is where the robot really is.
+
+nombre: Planta 1 · exterior línea 104
+ancho: 52
+alto: 38
+
+zonas:
+  - { id: sala-electrica, nombre: Sala eléctrica, x: 1, y: 1, ancho: 10, alto: 9 }
+  - { id: linea-104, nombre: Línea 104, x: 12, y: 7, ancho: 38, alto: 9 }
+  - { id: base, nombre: Base de carga, x: 2, y: 29, ancho: 8, alto: 7 }
+
+# The line itself, for the drawing: the pipe and what hangs on it.
+tuberias:
+  - { id: linea-104, desde: [12, 12], hasta: [50, 12] }
+
+equipos:
+  - { id: PLC-1, tipo: plc, x: 5, y: 5, nombre: PLC Siemens S7 }
+  - { id: PT-104, tipo: transmisor, x: 16, y: 12, nombre: Transmisor de presión, cable: PLC-1 }
+  - { id: PI-104, tipo: manometro, x: 22, y: 12, nombre: Manómetro local }
+  - { id: XV-104, tipo: valvula, x: 32, y: 12, nombre: Válvula manual }
+  - { id: EXT-12, tipo: extintor, x: 49, y: 26, nombre: Extintor }
+  - { id: BASE-1, tipo: base, x: 6, y: 32, nombre: Base de carga }
+
+# Closed loop: after the last point the robot goes back to the first one.
+ruta:
+  - [6, 32]
+  - [6, 20]
+  - [22, 20]
+  - [32, 20]
+  - [46, 20]
+  - [46, 26]
+  - [46, 32]
+
+paradas:
+  - { punto: [22, 20], accion: foto, equipo: PI-104 }
+  - { punto: [32, 20], accion: valvula, equipo: XV-104 }
+  - { punto: [46, 26], accion: foto, equipo: EXT-12 }

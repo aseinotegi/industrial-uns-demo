@@ -26,6 +26,7 @@ flowchart LR
     B -- orden --> R
     R -- "cierra XV-104" --> W
     B --> H["historian"] --> T[("TimescaleDB")] --> GR["Grafana"]
+    B <--> C["consola<br/>(plant-console)"]
 ```
 
 ## Arranque rápido
@@ -34,9 +35,11 @@ flowchart LR
 docker compose up --build
 ```
 
-Abre **http://localhost:3000** (Grafana, sin usuario). Cada tres minutos la presión de la línea sube de 4,2 hacia 6,8 bar, siguiendo [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). En menos de un minuto verás la alarma confirmada por las dos fuentes, al robot cerrando la XV-104 y la presión volviendo a su sitio.
+Abre **http://localhost:8000**, la consola de la planta ([plant-console](https://github.com/aseinotegi/plant-console)): el robot recorriendo su ruta sobre el mapa, el PLC, el namespace, las reglas (editables) y lo que la visión ha leído en cada foto. Grafana, con el histórico, está en **http://localhost:3000** (sin usuario).
 
-¿Demasiado lento para echar un vistazo? Con `WORLD_TIME_SCALE=0.25 ROBOT_ROUND_S=4 docker compose up --build` la historia completa pasa en menos de un minuto.
+Cada tres minutos la presión de la línea sube de 4,2 hacia 6,8 bar, siguiendo [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). En menos de un minuto verás la alarma confirmada por las dos fuentes, al robot cerrando la XV-104 y la presión volviendo a su sitio.
+
+¿Demasiado lento para echar un vistazo? Con `WORLD_TIME_SCALE=0.25 ROBOT_SPEED=6 ROBOT_DWELL_S=0.75 docker compose up --build` la historia completa pasa en menos de un minuto. El botón **Provocar sobrepresión** de la consola lanza una subida de presión en el momento en vez de esperar a la siguiente.
 
 El namespace en este momento:
 
@@ -106,10 +109,10 @@ Las fotos son sintéticas, hechas con el generador de poi-vision-inspector (`pyt
 
 ```bash
 ollama pull qwen3-vl
-INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_ROUND_S=30 docker compose up --build
+INSPECTOR_CONFIG=inspector.ollama.yaml ROBOT_DWELL_S=15 docker compose up --build
 ```
 
-Un modelo local tarda unos segundos por foto (más sin GPU), así que conviene darle al robot tiempo entre rondas con `ROBOT_ROUND_S`.
+Un modelo local tarda unos segundos por foto (más sin GPU), así que conviene que el robot espere más en cada parada con `ROBOT_DWELL_S`.
 
 ## El namespace
 
@@ -127,6 +130,7 @@ Una sola jerarquía, `planta/área/equipo/dato`, con los nombres del P&ID de la 
 | `planta1/exterior/xv-104/estado` | robot | sí | `abierta` / `cerrada` |
 | `planta1/robots/robot-01/foto` | robot | no | `IMG_0412`, con `poi` e `image_url` |
 | `planta1/robots/robot-01/mision` | robot | sí | `en-camino` / `completada` |
+| `planta1/robots/robot-01/posicion` | robot | sí | `en-ruta` / `inspeccionando` / `en-mision`…, con `x`, `y`, `rumbo` (5 por segundo, no se guarda) |
 | `planta1/servicios/<servicio>` | cada servicio | sí | `online` / `offline` (Last Will) |
 
 Todos los mensajes siguen el mismo contrato. Solo `value` es obligatorio y los campos extra se conservan:
@@ -184,7 +188,7 @@ scripts/        prueba de extremo a extremo (la usa la CI), generador del datase
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                  # 59 tests, sin broker ni base de datos
+pytest -q                  # 72 tests, sin broker ni base de datos
 ./scripts/smoke-test.sh    # todo el stack en Docker, comprobado de punta a punta
 ```
 

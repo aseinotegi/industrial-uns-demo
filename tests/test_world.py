@@ -124,3 +124,19 @@ def test_only_dataset_files_can_be_read():
         camera.read("../fotos.csv")
     with pytest.raises(KeyError):
         camera.shoot("pt-104", Line(scenario()))
+
+
+def test_a_disturbance_can_be_asked_for_and_starts_at_once():
+    line = Line(scenario(), seed=1)
+    run(line, 0, 5)
+    assert line.disturb_now() is True
+    t = run(line, 5, 30)
+    assert line.pressure > 6.0
+    assert line.disturb_now() is False  # one at a time
+    line.close_valve()
+    run(line, t, t + 40)
+    assert line.disturb_now() is True and line.valve_closed is False  # reopened for the new one
+
+
+def test_profile_knows_when_the_disturbance_starts():
+    assert scenario().profile.rise_at == 40
