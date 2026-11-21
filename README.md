@@ -73,11 +73,11 @@ The robot (`robot-01`) speeds up and slows down, slows at turns, spends battery 
 ## The dataset
 
 - [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv): the incoming pressure over one cycle. Flow, level, pump and temperature follow from it with simple physics.
-- [dataset/fotos/](dataset/fotos) and [fotos.csv](dataset/fotos.csv): 23 photos with their true value.
-  - **Real photos** from Wikimedia Commons (CC BY, CC BY-SA, CC0), one per point of the round, read by hand. Authors and licences are in [dataset/fotos/CREDITOS.md](dataset/fotos/CREDITOS.md) and next to each photo in the console.
-  - **PI-104**, the gauge that has to move with the line, is still generated: 15 photos every 0.25 bar from 4.0 to 7.0, two of them with glare or blur. The camera hands over the one closest to what the dial shows, so the photo and the PLC always agree.
+- [dataset/fotos/](dataset/fotos) and [fotos.csv](dataset/fotos.csv): 10 real photos from Wikimedia Commons (CC BY, CC BY-SA, CC0), with their true value read by hand. Authors and licences are in [dataset/fotos/CREDITOS.md](dataset/fotos/CREDITOS.md) and next to each photo in the console.
+  - **PI-104**, the gauge that has to follow the line, has two: one at 5.3 bar and the same photo retouched to 8 bar (marked as such). The camera hands over the one on the same side of the 6 bar alarm as the dial.
+- [respuestas-de-prueba.json](dataset/respuestas-de-prueba.json): what Gemini answered about each photo, box included, recorded with `python3 scripts/grabar-respuestas.py`. The robot's round replays them, mistakes included.
 
-`python scripts/make_dataset.py --originales <folder>` rebuilds it: it resizes the originals and writes the true values, the credits and the recorded answers.
+To add a photo: put it in `dataset/fotos/`, add its row to `fotos.csv` and its credit to `CREDITOS.md`, and record its answer.
 
 ### Which model reads the photos
 

@@ -1,7 +1,7 @@
 # poi-vision-inspector with recorded answers instead of a model: CI and a first run
-# with nothing to install. The answers come from the true values of the dataset
-# (dataset/respuestas-de-prueba.json), and every result says model: replay.
-# For a real model use inspector.ollama.yaml.
+# with nothing to install. The answers are what Gemini answered about each photo of
+# the dataset (dataset/respuestas-de-prueba.json), and every result says model: replay.
+# For a live model use inspector.gemini.yaml or inspector.ollama.yaml.
 
 provider:
   kind: replay

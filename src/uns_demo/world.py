@@ -25,9 +25,10 @@ Both come from ``dataset/``, so the demo is repeatable and easy to change:
 * ``dataset/plc/linea-104.csv``: the line pressure over one cycle while XV-104 is
   open (an upstream disturbance from 4.2 up to 6.8 bar and back). Closing the valve
   brings it down to normal; near the end of the cycle an operator reopens it.
-* ``dataset/fotos.csv``: the photos and their true values. The camera picks the
-  photo of PI-104 closest to what the dial shows right now, so the photo and the PLC
-  always tell the same story. Now and then it is the blurred or glared one.
+* ``dataset/fotos.csv``: the photos and their true values, all real. PI-104 has one
+  photo below the alarm (about 5 bar) and one above it (8 bar): the camera gives the
+  one on the same side of 6 bar as the dial, so the photo and the PLC tell the same
+  story.
 """
 
 from __future__ import annotations
@@ -278,6 +279,9 @@ class Photo:
         return self.value in ("OK", "NOK")
 
 
+ALARM_BAR = 6.0  # PI-104 above this is the overpressure the rule looks for
+
+
 class Camera:
     """What the robot's camera sees at each point of interest, from the dataset."""
 
@@ -319,13 +323,11 @@ class Camera:
         return self._rng.choice(photos)  # a gauge that does not move in this story
 
     def _gauge(self, photos: list[Photo], dial: float) -> Photo:
-        nearest = min({float(p.value) for p in photos}, key=lambda v: abs(v - dial))
-        same = [p for p in photos if float(p.value) == nearest]
-        troubled = [p for p in same if p.condition != "limpia"]
-        if troubled and self._rng.random() < self._trouble_rate:
-            return self._rng.choice(troubled)
-        clean = [p for p in same if p.condition == "limpia"] or same
-        return clean[0]
+        # Real photos are few: what matters is which side of the alarm the dial is on,
+        # then the closest of those.
+        above = dial > ALARM_BAR
+        side = [p for p in photos if (float(p.value) > ALARM_BAR) == above] or photos
+        return min(side, key=lambda p: abs(float(p.value) - dial))
 
     def _state_photo(self, poi: str, photos: list[Photo]) -> Photo:
         # An extinguisher does not change every round: it is fine for a while, and when

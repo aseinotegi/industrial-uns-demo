@@ -151,18 +151,12 @@ def test_every_photo_listed_in_the_dataset_exists_and_has_a_recorded_answer():
         assert hashlib.sha256(data).hexdigest() in answers, photo.file
 
 
-def test_the_gauge_photo_matches_what_the_dial_shows():
-    line, camera = Line(scenario(), seed=1), Camera(DATASET, seed=1, trouble_rate=0)
-    for pressure, expected in [(4.12, "4.25"), (6.4, "6.50"), (6.9, "7.00")]:
+def test_the_gauge_photo_is_on_the_same_side_of_the_alarm_as_the_dial():
+    line, camera = Line(scenario(), seed=1), Camera(DATASET, seed=1)
+    for pressure, expected in [(4.12, "5.3"), (5.7, "5.3"), (6.1, "8.0"), (6.9, "8.0")]:
         line.pressure = pressure  # the dial reads about 0.08 bar more
         photo = camera.shoot("pi-104", line)
-        assert (photo.poi, photo.value, photo.condition) == ("PI-104", expected, "limpia")
-
-
-def test_now_and_then_the_camera_gets_a_bad_photo():
-    line, camera = Line(scenario(), seed=1), Camera(DATASET, seed=1, trouble_rate=1)
-    line.pressure = 6.67  # dial ~6.75, where there is a blurred photo
-    assert camera.shoot("pi-104", line).condition == "desenfoque"
+        assert (photo.poi, photo.value) == ("PI-104", expected), pressure
 
 
 def test_the_extinguisher_is_mostly_fine_and_its_state_lasts_several_rounds():
@@ -175,8 +169,7 @@ def test_the_extinguisher_is_mostly_fine_and_its_state_lasts_several_rounds():
 
 
 def test_real_photos_carry_their_credit():
-    credits = Camera(DATASET).credits()
-    real = {f: c for f, c in credits.items() if not f.startswith("pi-104")}
+    real = Camera(DATASET).credits()  # every photo is a real one
     assert real and all(
         c["licencia"].startswith("CC") and "wikimedia.org" in c["fuente"] for c in real.values()
     )

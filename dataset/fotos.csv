@@ -1,19 +1,6 @@
 archivo,poi,valor,condicion,autor,licencia,fuente
-pi-104_4.00.jpg,PI-104,4.00,limpia,generada con poi_inspector.synth,MIT,
-pi-104_4.25.jpg,PI-104,4.25,limpia,generada con poi_inspector.synth,MIT,
-pi-104_4.50.jpg,PI-104,4.50,limpia,generada con poi_inspector.synth,MIT,
-pi-104_4.75.jpg,PI-104,4.75,limpia,generada con poi_inspector.synth,MIT,
-pi-104_5.00.jpg,PI-104,5.00,limpia,generada con poi_inspector.synth,MIT,
-pi-104_5.25.jpg,PI-104,5.25,limpia,generada con poi_inspector.synth,MIT,
-pi-104_5.50.jpg,PI-104,5.50,limpia,generada con poi_inspector.synth,MIT,
-pi-104_5.75.jpg,PI-104,5.75,limpia,generada con poi_inspector.synth,MIT,
-pi-104_6.00.jpg,PI-104,6.00,limpia,generada con poi_inspector.synth,MIT,
-pi-104_6.25.jpg,PI-104,6.25,limpia,generada con poi_inspector.synth,MIT,
-pi-104_6.50.jpg,PI-104,6.50,limpia,generada con poi_inspector.synth,MIT,
-pi-104_6.75.jpg,PI-104,6.75,limpia,generada con poi_inspector.synth,MIT,
-pi-104_7.00.jpg,PI-104,7.00,limpia,generada con poi_inspector.synth,MIT,
-pi-104_5.50_reflejo.jpg,PI-104,5.50,reflejo,generada con poi_inspector.synth,MIT,
-pi-104_6.75_desenfoque.jpg,PI-104,6.75,desenfoque,generada con poi_inspector.synth,MIT,
+pi-104_5.3.jpg,PI-104,5.3,real,Holmium,CC BY-SA 3.0,https://commons.wikimedia.org/wiki/File:Manometers_at_a_pressure_control_station.JPG
+pi-104_8.0.jpg,PI-104,8.0,retocada,"Holmium, retocada (aguja a 8 bar)",CC BY-SA 3.0,https://commons.wikimedia.org/wiki/File:Manometers_at_a_pressure_control_station.JPG
 pi-610_21.0.jpg,PI-610,21.0,real,Eng.dilan86,CC BY-SA 4.0,https://commons.wikimedia.org/wiki/File:Bar_gauge.jpg
 pi-201_1.7.jpg,PI-201,1.7,real,Shixart1985,CC BY 2.0,https://commons.wikimedia.org/wiki/File:A_pressure_gauge_attached_to_a_heating_system.jpg
 piv-801_-20.jpg,PIV-801,-20,real,VeRdUgO PY,CC BY-SA 4.0,https://commons.wikimedia.org/wiki/File:Pressure-vacuum_gauge_transformer.jpg
