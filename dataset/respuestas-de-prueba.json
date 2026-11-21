@@ -1,5 +1,5 @@
 {
- "_nota": "Respuestas de prueba escritas desde los valores reales del dataset. No son lecturas de un modelo.",
+ "_nota": "Fotos reales: respuestas que dio gemini-3.5-flash-lite el 21-nov-2026, con su caja, grabadas con scripts/grabar-respuestas.py; tal cual, aciertos y errores. Fotos generadas de PI-104: escritas desde el valor real del dataset, no son lecturas de un modelo.",
  "ee942b77993804654c39313cedcc23108ad2f7779a39186c0fe2a352f8ebbaef": {
   "value": 4.0,
   "unit": "bar",
@@ -106,55 +106,107 @@
   "evidence": "the needle is blurred, the scale cannot be read"
  },
  "a8c9e7280230ce3799c1bd2f7915b862e47b20a5e59220f12233655dd96ca1cb": {
-  "value": 21.0,
+  "value": 11.0,
   "unit": "bar",
   "status_reason": "lectura_valida",
-  "confidence": 0.9,
-  "evidence": "WIKA 0-25 bar gauge, needle just past 20"
+  "confidence": 0.95,
+  "evidence": "The needle points exactly at the 11 bar mark on the dial.",
+  "bbox_2d": [
+   39,
+   41,
+   665,
+   618
+  ]
  },
  "5989559ef6863b36ed494b53182620c121ce607a5d5cc69eee88fdf22d0b2c44": {
   "value": 1.7,
   "unit": "bar",
   "status_reason": "lectura_valida",
-  "confidence": 0.88,
-  "evidence": "red pressure needle between 1.5 and 2 bar on the upper scale"
+  "confidence": 0.95,
+  "evidence": "The upper red needle on the bar scale points just below the 2 mark, at approximately 1.7 bar.",
+  "bbox_2d": [
+   253,
+   342,
+   732,
+   668
+  ]
  },
  "1a50b2bcb3381ac0ed689bf602630086d6d03d64ebb7c039f45911b5345daea8": {
-  "value": -20.0,
+  "value": -10.0,
   "unit": "kPa",
   "status_reason": "lectura_valida",
-  "confidence": 0.85,
-  "evidence": "vacuum/pressure gauge, needle on -20 kPa"
+  "confidence": 0.95,
+  "evidence": "The needle points to approximately -10 kPa on the upper vacuum/pressure gauge.",
+  "bbox_2d": [
+   327,
+   109,
+   711,
+   323
+  ]
  },
  "228e4321b85a29c7ef6ad86cc7950a638d84cf9ba3a0d4b26c82ecad01416dda": {
   "value": null,
   "unit": null,
   "status_reason": "no_legible",
   "confidence": 0.3,
-  "evidence": "dirty, worn dial: the scale numbers cannot be read"
+  "evidence": "The pressure gauge is heavily weathered, scratched, and rusted, making the scale and exact needle position illegible.",
+  "bbox_2d": [
+   214,
+   213,
+   687,
+   807
+  ]
  },
  "8c227a2f81f0968efb3dbf7847798cb79ffb8a75d9f3725ff7ed7a22bb21e575": {
   "value": "OK",
+  "unit": null,
   "status_reason": "correcto",
-  "confidence": 0.92,
-  "evidence": "CO2 extinguisher hanging on its wall bracket"
+  "confidence": 0.99,
+  "evidence": "The fire extinguisher is properly mounted on its wall bracket and looks complete.",
+  "bbox_2d": [
+   18,
+   18,
+   620,
+   996
+  ]
  },
  "8135700f25c77798df325af8784844dfb722e374252f5fb7aec2d94dfc9e7292": {
   "value": "NOK",
+  "unit": null,
   "status_reason": "fuera_de_soporte",
-  "confidence": 0.9,
-  "evidence": "CO2 extinguisher lying on the floor, not on its bracket"
+  "confidence": 0.99,
+  "evidence": "El extintor se encuentra tirado en el suelo en lugar de colgar en su soporte.",
+  "bbox_2d": [
+   262,
+   287,
+   866,
+   583
+  ]
  },
  "304be58e33422b45de837abc0d9b84b68789cd9808b08034b50e9fbeca111869": {
   "value": "OK",
+  "unit": null,
   "status_reason": "correcto",
-  "confidence": 0.86,
-  "evidence": "extinguisher on the wall under its sign"
+  "confidence": 0.98,
+  "evidence": "The fire extinguisher hangs properly on its wall bracket.",
+  "bbox_2d": [
+   308,
+   307,
+   654,
+   497
+  ]
  },
  "1de37c68a7581de1cdc708c8c8d2a017bad38b5a9468639a863cbf402b96a16a": {
   "value": "NOK",
+  "unit": null,
   "status_reason": "fuera_de_soporte",
-  "confidence": 0.9,
-  "evidence": "powder extinguishers standing on the floor, off their bracket"
+  "confidence": 0.99,
+  "evidence": "Two fire extinguishers are lying loose on the floor instead of being mounted on their wall bracket.",
+  "bbox_2d": [
+   220,
+   351,
+   728,
+   799
+  ]
  }
 }
