@@ -4,7 +4,8 @@ readings the robot's round replays are what a model really saw in those photos.
 
 Run it where the stack runs, with GEMINI_API_KEY in .env (the public profile):
 
-    python3 scripts/grabar-respuestas.py
+    python3 scripts/grabar-respuestas.py           # every photo
+    python3 scripts/grabar-respuestas.py pi-104    # only the photos whose name starts so
 
 It changes nothing: it only prints. Generated photos are skipped.
 """
@@ -44,10 +45,13 @@ def ask(photo: Path, poi: str) -> dict:
 
 
 def main() -> int:
+    only = tuple(prefix.lower() for prefix in sys.argv[1:])
     answers: dict[str, dict] = {}
     with open(ROOT / "dataset" / "fotos.csv", encoding="utf-8") as rows:
         for row in csv.DictReader(rows):
             if not row["licencia"].startswith("CC"):
+                continue
+            if only and not row["archivo"].lower().startswith(only):
                 continue
             photo = ROOT / "dataset" / "fotos" / row["archivo"]
             try:

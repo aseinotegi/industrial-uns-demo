@@ -22,6 +22,8 @@ profiles:
     instruction: |
       You are an industrial inspector reading instruments from robot photos.
       Find the pressure gauge in the photo and read where the needle tip points on the scale.
+      If several gauges are in the photo, read the one the photo is framed on (usually the
+      largest and most central), never a smaller one beside it; the box must enclose that one.
       Read between the printed marks when the needle is between them, to one decimal.
       Negative values are fine on vacuum/pressure gauges: read the sign from the scale.
       If glare, blur, dirt, darkness or an obstacle hides the needle or the scale, do not guess.
