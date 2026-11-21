@@ -41,7 +41,7 @@ def ask(photo: Path, poi: str) -> dict:
         answer = None
     if not isinstance(answer, dict):
         answer = {key: result.get(key) for key in FIELDS}
-    return {key: answer.get(key) for key in FIELDS}
+    return {key: answer[key] for key in FIELDS if key in answer}  # a state has no unit
 
 
 def main() -> int:
@@ -60,9 +60,9 @@ def main() -> int:
                 print(f"{row['archivo']}: ERROR {error}", file=sys.stderr)
                 continue
             answers[hashlib.sha256(photo.read_bytes()).hexdigest()] = {"archivo": row["archivo"], **answer}
-            reading = f"{answer['value']} {answer['unit'] or ''}"
-            boxes = f"caja {answer['bbox_2d']} · otras {answer['other_boxes']}"
-            summary = f"{reading} · {answer['confidence']} · {boxes}"
+            reading = f"{answer.get('value')} {answer.get('unit') or ''}"
+            boxes = f"caja {answer.get('bbox_2d')} · otras {answer.get('other_boxes')}"
+            summary = f"{reading} · {answer.get('confidence')} · {boxes}"
             print(f"{row['archivo']}: {summary}", file=sys.stderr)
     print(json.dumps(answers, ensure_ascii=False))
     return 0

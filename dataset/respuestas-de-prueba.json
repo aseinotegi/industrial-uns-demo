@@ -113,7 +113,6 @@
  },
  "8c227a2f81f0968efb3dbf7847798cb79ffb8a75d9f3725ff7ed7a22bb21e575": {
   "value": "OK",
-  "unit": null,
   "status_reason": "correcto",
   "confidence": 0.98,
   "evidence": "The fire extinguisher hangs securely on its wall bracket and appears complete.",
@@ -127,7 +126,6 @@
  },
  "8135700f25c77798df325af8784844dfb722e374252f5fb7aec2d94dfc9e7292": {
   "value": "NOK",
-  "unit": null,
   "status_reason": "fuera_de_soporte",
   "confidence": 0.99,
   "evidence": "The fire extinguisher is lying on the floor instead of hanging on its wall bracket.",
@@ -141,7 +139,6 @@
  },
  "304be58e33422b45de837abc0d9b84b68789cd9808b08034b50e9fbeca111869": {
   "value": "OK",
-  "unit": null,
   "status_reason": "correcto",
   "confidence": 0.95,
   "evidence": "The fire extinguisher is properly mounted on its wall bracket and appears complete.",
@@ -155,7 +152,6 @@
  },
  "1de37c68a7581de1cdc708c8c8d2a017bad38b5a9468639a863cbf402b96a16a": {
   "value": "NOK",
-  "unit": null,
   "status_reason": "fuera_de_soporte",
   "confidence": 0.99,
   "evidence": "The fire extinguisher is lying on the floor instead of hanging on its bracket.",

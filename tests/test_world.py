@@ -151,6 +151,24 @@ def test_every_photo_listed_in_the_dataset_exists_and_has_a_recorded_answer():
         assert hashlib.sha256(data).hexdigest() in answers, photo.file
 
 
+def test_every_recorded_answer_fits_its_question_and_locates_the_object():
+    """What the inspector checks first: a key the schema does not have rejects the whole answer."""
+    import hashlib
+    import json
+
+    import yaml
+
+    config = yaml.safe_load((DATASET.parent / "config" / "inspector.yaml").read_text(encoding="utf-8"))
+    answers = json.loads((DATASET / "respuestas-de-prueba.json").read_text(encoding="utf-8"))
+    common = {"value", "status_reason", "confidence", "evidence", "bbox_2d", "other_boxes"}
+    camera = Camera(DATASET)
+    for photo in camera.photos:
+        answer = answers[hashlib.sha256(camera.read(photo.file)).hexdigest()]
+        kind = config["profiles"][config["pois"][photo.poi]["profile"]]["kind"]
+        assert set(answer) <= (common | {"unit"} if kind == "numeric" else common), photo.file
+        assert answer["bbox_2d"], photo.file
+
+
 def test_the_gauge_photo_is_on_the_same_side_of_the_alarm_as_the_dial():
     line, camera = Line(scenario(), seed=1), Camera(DATASET, seed=1)
     for pressure, expected in [(4.12, "5.3"), (5.7, "5.3"), (6.1, "8.0"), (6.9, "8.0")]:
