@@ -4,8 +4,12 @@ readings the robot's round replays are what a model really saw in those photos.
 
 Run it where the stack runs, with GEMINI_API_KEY in .env (the public profile):
 
-    python3 scripts/grabar-respuestas.py           # every photo
-    python3 scripts/grabar-respuestas.py pi-104    # only the photos whose name starts so
+    python3 scripts/grabar-respuestas.py                            # every photo
+    python3 scripts/grabar-respuestas.py pi-104                     # only those starting so
+    python3 scripts/grabar-respuestas.py --modelo gemini-3.5-flash  # another Gemini model
+
+By default it records with gemini-3.5-flash, a step above the Flash-Lite that answers the
+visitors: slower, but the recorded answers are what the demo shows on every round.
 
 It changes nothing: it only prints. Generated photos are skipped.
 """
@@ -23,9 +27,13 @@ ROOT = Path(__file__).resolve().parent.parent
 FIELDS = ("value", "unit", "status_reason", "confidence", "evidence", "bbox_2d", "other_boxes")
 
 
-def ask(photo: Path, poi: str) -> dict:
+MODEL = "gemini-3.5-flash"
+
+
+def ask(photo: Path, poi: str, model: str) -> dict:
     command = [
         "docker", "compose", "run", "--rm", "--no-deps", "-T", "--entrypoint", "poi-inspect",
+        "-e", f"POI_PROVIDER_MODEL={model}",
         "-v", f"{ROOT / 'config' / 'inspector.gemini.yaml'}:/grabar/gemini.yaml:ro",
         "-v", f"{photo}:/grabar/foto.jpg:ro",
         "inspector", "--config", "/grabar/gemini.yaml", "read", "/grabar/foto.jpg", "--poi", poi,
@@ -45,7 +53,14 @@ def ask(photo: Path, poi: str) -> dict:
 
 
 def main() -> int:
-    only = tuple(prefix.lower() for prefix in sys.argv[1:])
+    args = sys.argv[1:]
+    model = MODEL
+    if "--modelo" in args:
+        at = args.index("--modelo")
+        model = args[at + 1]
+        del args[at : at + 2]
+    only = tuple(prefix.lower() for prefix in args)
+    print(f"modelo: {model}", file=sys.stderr)
     answers: dict[str, dict] = {}
     with open(ROOT / "dataset" / "fotos.csv", encoding="utf-8") as rows:
         for row in csv.DictReader(rows):
@@ -55,7 +70,7 @@ def main() -> int:
                 continue
             photo = ROOT / "dataset" / "fotos" / row["archivo"]
             try:
-                answer = ask(photo, row["poi"])
+                answer = ask(photo, row["poi"], model)
             except RuntimeError as error:
                 print(f"{row['archivo']}: ERROR {error}", file=sys.stderr)
                 continue
