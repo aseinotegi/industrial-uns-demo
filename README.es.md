@@ -154,12 +154,13 @@ La demo aplica lo básico de IEC 62443 a escala de portátil, y la página **Cib
 
 **La demo pública** ([docker-compose.publico.yml](docker-compose.publico.yml)) corre en una Raspberry Pi 5 detrás de un Cloudflare Tunnel: una conexión saliente, TLS en Cloudflare, ningún puerto abierto en casa ni publicado en el host. Además de lo anterior:
 
-- la consola en modo **showroom**: reglas de solo lectura, sin pruebas, el botón de perturbación y los ensayos de visión racionados por visitante y en total, una foto del catálogo ya analizada se responde de memoria, sin subidas, cuerpos de petición limitados y una Content-Security-Policy estricta;
+- la consola en modo **showroom**: reglas de solo lectura, sin pruebas, el botón de perturbación y los ensayos de visión racionados por visitante, por hora y por día, una foto del catálogo ya analizada se responde de memoria, cuerpos de petición limitados y una Content-Security-Policy estricta;
+- el visitante puede subir la foto de un manómetro o de un extintor: la lee Gemini (las rondas del robot siguen con lecturas grabadas, sin coste), la página avisa de que en el plan gratuito Google puede usarla, y la foto no se guarda ni la ve nadie más;
 - el broker con [acl.showroom](config/mosquitto/acl.showroom): la consola no puede proponer reglas ni aunque la tomaran;
 - Grafana anónimo y de solo lectura, sin formulario de login, snapshots ni dashboards públicos; su usuario de base de datos corta cualquier consulta a los 5 s, con 10 conexiones como mucho;
-- los secretos (token del túnel, contraseñas de la base de datos y de Grafana) solo en el `.env` de la Pi; el histórico guarda 7 días.
+- los secretos (token del túnel, clave de Gemini, contraseñas MQTT, de la base de datos y de Grafana) solo en el `.env` de la Pi: el perfil público no arranca sin ellos; el histórico guarda 7 días.
 
-Falta: registros de auditoría centralizados y secretos para los usuarios MQTT (el broker no es alcanzable desde fuera, pero sus contraseñas siguen siendo las de demo). El CI comprueba el resto en cada push: acceso anónimo rechazado, una orden desde la consola descartada y Grafana sin poder borrar el histórico.
+Falta: registros de auditoría centralizados. El CI comprueba el resto en cada push: acceso anónimo rechazado, una orden desde la consola descartada y Grafana sin poder borrar el histórico.
 
 ## Decisiones de diseño
 

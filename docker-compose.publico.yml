@@ -6,6 +6,8 @@
 #     GRAFANA_URL=https://demo-grafana.andersein.com
 #     GRAFANA_ADMIN_PASSWORD=...    random; nobody logs in, but it must not be the demo one
 #     DB_PASSWORD=..., GRAFANA_DB_PASSWORD=...
+#     MQTT_PASSWORD_<SERVICE>=...   one per MQTT user (see the broker below)
+#     GEMINI_API_KEY=...            reads the photos visitors send
 #   then: docker compose up -d --build
 #
 # The tunnel routes demo.andersein.com to http://console:8000 and
@@ -14,7 +16,8 @@
 #
 # What changes for a visitor from the internet:
 # * console in SHOWROOM mode: read-only rules, no probes, rationed disturbance and
-#   vision trials, no uploads, capped bodies, strict CSP (see plant-console's README).
+#   vision trials, capped bodies, strict CSP (see plant-console's README). Visitors may
+#   upload a photo, read by Gemini, within an hourly and daily budget; it is never kept.
 # * broker with acl.showroom: the console cannot propose rules, whatever it is told.
 # * Grafana: anonymous viewer only, no login form, no snapshots, no public dashboards,
 #   version hidden; its database user gives up any query after 5 s.
@@ -36,12 +39,35 @@ services:
   broker:
     environment:
       ACL_FILE: acl.showroom
+      # The same list as in docker-compose.yml, but without demo passwords to fall back on.
+      MQTT_PASSWORDS: >-
+        plc-gateway:${MQTT_PASSWORD_PLC_GATEWAY:?MQTT_PASSWORD_PLC_GATEWAY missing in .env}
+        robot-01:${MQTT_PASSWORD_ROBOT:?MQTT_PASSWORD_ROBOT missing in .env}
+        inspector:${MQTT_PASSWORD_INSPECTOR:?MQTT_PASSWORD_INSPECTOR missing in .env}
+        rules:${MQTT_PASSWORD_RULES:?MQTT_PASSWORD_RULES missing in .env}
+        historian:${MQTT_PASSWORD_HISTORIAN:?MQTT_PASSWORD_HISTORIAN missing in .env}
+        simulador:${MQTT_PASSWORD_SIMULADOR:?MQTT_PASSWORD_SIMULADOR missing in .env}
+        console:${MQTT_PASSWORD_CONSOLE:?MQTT_PASSWORD_CONSOLE missing in .env}
+        tree:${MQTT_PASSWORD_TREE:?MQTT_PASSWORD_TREE missing in .env}
+        explorer:${MQTT_PASSWORD_EXPLORER:?MQTT_PASSWORD_EXPLORER missing in .env}
     ports: !reset []
 
   console:
     environment:
       SHOWROOM: "true"
       GRAFANA_URL: ${GRAFANA_URL:?GRAFANA_URL missing in .env}
+      UPLOADS: "true"  # visitors try their own photos, read by Gemini, within these limits:
+      TRIALS_PER_VISITOR_HOUR: ${TRIALS_PER_VISITOR_HOUR:-5}
+      TRIALS_PER_HOUR: ${TRIALS_PER_HOUR:-30}
+      TRIALS_PER_DAY: ${TRIALS_PER_DAY:-200}
+
+  # The robot's rounds keep their recorded readings; only the photos visitors send
+  # (catalog or their own) go to Gemini.
+  inspector:
+    environment:
+      POI_TRIAL_PROVIDER: gemini
+      POI_TRIAL_MODEL: ${POI_TRIAL_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY missing in .env}
     ports: !reset []
 
   grafana:

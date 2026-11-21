@@ -154,12 +154,13 @@ The demo applies the basics of IEC 62443 at laptop scale, and the console's **Ci
 
 **The public demo** ([docker-compose.publico.yml](docker-compose.publico.yml)) runs on a Raspberry Pi 5 behind a Cloudflare Tunnel: an outbound connection, TLS at Cloudflare, no port open at home and none published on the host. On top of the above:
 
-- the console in **showroom** mode: read-only rules, no probes, the disturbance button and the vision trials rationed per visitor and overall, a catalog photo answered from memory once analyzed, no uploads, capped request bodies and a strict Content-Security-Policy;
+- the console in **showroom** mode: read-only rules, no probes, the disturbance button and the vision trials rationed per visitor, per hour and per day, a catalog photo answered from memory once analyzed, capped request bodies and a strict Content-Security-Policy;
+- visitors can upload a photo of a gauge or an extinguisher: Gemini reads it (the robot's rounds keep their recorded readings, at no cost), the page says Google may use it on the free tier, and the photo is never stored nor shown to anyone else;
 - the broker with [acl.showroom](config/mosquitto/acl.showroom): the console cannot propose rules even if it were taken over;
 - Grafana anonymous and read-only, without login form, snapshots or public dashboards; its database user gives up any query after 5 s, with at most 10 connections;
-- secrets (tunnel token, database and Grafana passwords) only in the Pi's `.env`; the history keeps 7 days.
+- secrets (tunnel token, Gemini key, MQTT, database and Grafana passwords) only in the Pi's `.env`: the public profile refuses to start without them; the history keeps 7 days.
 
-Not done yet: centralised audit logs, and secrets for the MQTT users (the broker is not reachable from outside, but its passwords are still the demo ones). The CI checks the rest on every push: anonymous access refused, an order from the console dropped, Grafana unable to delete history.
+Not done yet: centralised audit logs. The CI checks the rest on every push: anonymous access refused, an order from the console dropped, Grafana unable to delete history.
 
 ## Design decisions
 

@@ -16,8 +16,9 @@
 #   with a read-only filesystem.
 # * only the console (8000) and Grafana (3000) are published; the broker only on
 #   localhost, for MQTT Explorer with the read-only user "explorer".
-# Passwords are demo ones, the same here and in config/mosquitto/passwords. Change both
-# before running this anywhere but your own computer.
+# Passwords are demo ones unless .env sets them (MQTT_PASSWORD_<SERVICE>, DB_PASSWORD,
+# GRAFANA_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD): set them before running this anywhere but
+# your own computer. docker-compose.publico.yml refuses to start without them.
 
 x-hardened: &hardened
   restart: unless-stopped
@@ -41,15 +42,28 @@ services:
     user: "1883:1883"
     read_only: true
     tmpfs: [/tmp]
-    # Passwords are hashed at start, never stored in clear inside the container's config.
+    # Passwords come from MQTT_PASSWORDS and are hashed at start into /tmp (in memory).
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        tr -d '\r' < /mosquitto/config/passwords > /tmp/mosquitto-passwd &&
+        printf '%s\n' $$MQTT_PASSWORDS > /tmp/mosquitto-passwd &&
         tr -d '\r' < /mosquitto/config/$${ACL_FILE:-acl} > /tmp/mosquitto-acl &&
         chmod 0700 /tmp/mosquitto-passwd /tmp/mosquitto-acl &&
         mosquitto_passwd -U /tmp/mosquitto-passwd &&
         exec mosquitto -c /mosquitto/config/mosquitto.conf
+    environment:
+      # user:password, one per service. Demo passwords unless .env says otherwise
+      # (MQTT_PASSWORD_CONSOLE=..., etc.): each service reads its own from the same variable.
+      MQTT_PASSWORDS: >-
+        plc-gateway:${MQTT_PASSWORD_PLC_GATEWAY:-demo-plc-gateway}
+        robot-01:${MQTT_PASSWORD_ROBOT:-demo-robot-01}
+        inspector:${MQTT_PASSWORD_INSPECTOR:-demo-inspector}
+        rules:${MQTT_PASSWORD_RULES:-demo-rules}
+        historian:${MQTT_PASSWORD_HISTORIAN:-demo-historian}
+        simulador:${MQTT_PASSWORD_SIMULADOR:-demo-simulador}
+        console:${MQTT_PASSWORD_CONSOLE:-demo-console}
+        tree:${MQTT_PASSWORD_TREE:-demo-tree}
+        explorer:${MQTT_PASSWORD_EXPLORER:-explorer}
     volumes:
       - ./config/mosquitto:/mosquitto/config:ro
     ports: ["127.0.0.1:1883:1883"]
@@ -78,7 +92,7 @@ services:
       PLC_HOST: world
       PLC_PORT: "1102"
       MQTT_USERNAME: plc-gateway
-      MQTT_PASSWORD: demo-plc-gateway
+      MQTT_PASSWORD: ${MQTT_PASSWORD_PLC_GATEWAY:-demo-plc-gateway}
     volumes:
       - ./config/plc-gateway.yaml:/config/config.yaml:ro
     networks: [campo, uns]
@@ -92,7 +106,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: robot-01
-      MQTT_PASSWORD: demo-robot-01
+      MQTT_PASSWORD: ${MQTT_PASSWORD_ROBOT:-demo-robot-01}
       WORLD_URL: http://world:8080
       ROBOT_URL: http://robot:8081
       PLANT_FILE: /app/config/planta.yaml
@@ -113,7 +127,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: simulador
-      MQTT_PASSWORD: demo-simulador
+      MQTT_PASSWORD: ${MQTT_PASSWORD_SIMULADOR:-demo-simulador}
       WORLD_URL: http://world:8080
     networks: [campo, uns]
 
@@ -126,7 +140,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: inspector
-      MQTT_PASSWORD: demo-inspector
+      MQTT_PASSWORD: ${MQTT_PASSWORD_INSPECTOR:-demo-inspector}
       POI_PROVIDER_URL: ${POI_PROVIDER_URL:-}
       POI_PROVIDER_MODEL: ${POI_PROVIDER_MODEL:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}  # only for inspector.gemini.yaml; from .env
@@ -147,7 +161,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: rules
-      MQTT_PASSWORD: demo-rules
+      MQTT_PASSWORD: ${MQTT_PASSWORD_RULES:-demo-rules}
       RULES_FILE: /data/rules.yaml
       RULES_DEFAULT: /app/config/rules.yaml
       RULES_ORDERS: planta1/exterior/xv-104/orden=cerrar  # the only order a rule may send
@@ -163,7 +177,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: historian
-      MQTT_PASSWORD: demo-historian
+      MQTT_PASSWORD: ${MQTT_PASSWORD_HISTORIAN:-demo-historian}
       DATABASE_URL: postgresql://uns:${DB_PASSWORD:-demo-uns}@timescaledb:5432/uns
       GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}  # it creates Grafana's read-only user
       RETENTION_DAYS: ${RETENTION_DAYS:-0}  # 0: keep everything
@@ -210,7 +224,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: console
-      MQTT_PASSWORD: demo-console
+      MQTT_PASSWORD: ${MQTT_PASSWORD_CONSOLE:-demo-console}
       ROBOT_URL: http://robot:8081
       GRAFANA_URL: ${GRAFANA_URL:-}   # as the browser sees it; empty: same host, port 3000
       SERVICES_FILE: /app/config/servicios.yaml
@@ -227,7 +241,7 @@ services:
     environment:
       <<: *mqtt
       MQTT_USERNAME: tree
-      MQTT_PASSWORD: demo-tree
+      MQTT_PASSWORD: ${MQTT_PASSWORD_TREE:-demo-tree}
     profiles: [tools]
     networks: [uns]
 
