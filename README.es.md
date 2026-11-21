@@ -36,7 +36,7 @@ docker compose up --build
 
 Abre **http://localhost:8000**, la consola de la planta ([plant-console](https://github.com/aseinotegi/plant-console)): el plano con el robot recorriendo su ruta, las señales del PLC, lo que ha leído la visión con cada foto, un constructor de reglas, el namespace, el MQTT en directo, el histórico (Grafana, dentro de la consola), la arquitectura y los controles de ciberseguridad.
 
-Cada seis minutos la presión que entra en la línea 104 sube de 4,2 hacia 6,8 bar, siguiendo [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). En su siguiente pasada el robot fotografía el manómetro PI-104, la visión y el transmisor del PLC coinciden, la regla salta, el robot va a la XV-104, la cierra y la presión baja.
+Cada seis minutos la presión que entra en la línea 104 sube de 4,2 hacia 8 bar, siguiendo [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). En su siguiente pasada el robot fotografía el manómetro PI-104, la visión y el transmisor del PLC coinciden, la regla salta, el robot va a la XV-104, la cierra y la presión baja.
 
 ¿Demasiado lento para un primer vistazo? Todo cuatro veces más rápido:
 
@@ -118,7 +118,7 @@ Una jerarquía, `planta/área/equipo/dato`, con los nombres del P&ID de la plant
 Todos los mensajes siguen un contrato. Solo `value` es obligatorio y los campos extra se conservan:
 
 ```json
-{"value": 6.8, "unit": "bar", "ts": "2026-11-18T15:28:54.920Z",
+{"value": 7.9, "unit": "bar", "ts": "2026-11-18T15:28:54.920Z",
  "source": "inspector", "quality": "good", "confidence": 0.94, "model": "qwen3-vl"}
 ```
 

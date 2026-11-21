@@ -40,7 +40,7 @@ def test_the_shipped_profile_goes_from_normal_to_peak_and_back():
     profile = scenario().profile
     assert profile.cycle_s == 360
     assert profile.at(0) == profile.at(360) == NORMAL_BAR
-    assert max(profile.at(t) for t in range(361)) == 6.8
+    assert max(profile.at(t) for t in range(361)) == 8.0
 
 
 def test_pressure_follows_the_profile_while_the_valve_is_open():
@@ -48,7 +48,7 @@ def test_pressure_follows_the_profile_while_the_valve_is_open():
     run(line, 0, 75)
     assert abs(line.pressure - NORMAL_BAR) < 0.01
     run(line, 75, 150)
-    assert 6.0 < line.pressure <= 6.8
+    assert 6.0 < line.pressure <= 8.0
 
 
 def test_closing_the_valve_brings_pressure_back_to_normal():

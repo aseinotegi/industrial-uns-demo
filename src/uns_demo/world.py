@@ -23,7 +23,7 @@ It exposes them the way a real plant would:
 Both come from ``dataset/``, so the demo is repeatable and easy to change:
 
 * ``dataset/plc/linea-104.csv``: the line pressure over one cycle while XV-104 is
-  open (an upstream disturbance from 4.2 up to 6.8 bar and back). Closing the valve
+  open (an upstream disturbance from 4.2 up to 8 bar and back). Closing the valve
   brings it down to normal; near the end of the cycle an operator reopens it.
 * ``dataset/fotos.csv``: the photos and their true values, all real. PI-104 has one
   photo below the alarm (about 5 bar) and one above it (8 bar): the camera gives the

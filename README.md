@@ -36,7 +36,7 @@ docker compose up --build
 
 Open **http://localhost:8000**, the plant console ([plant-console](https://github.com/aseinotegi/plant-console)): the plant map with the robot walking its route, the PLC signals, the vision results with each photo, a rule builder, the namespace, a live MQTT view, the history (Grafana, embedded), the architecture and the security controls.
 
-Every six minutes the pressure coming into line 104 rises from 4.2 towards 6.8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). On its next pass the robot photographs gauge PI-104, the vision reading and the PLC transmitter agree, the rule fires, the robot walks to XV-104, closes it and the pressure falls back.
+Every six minutes the pressure coming into line 104 rises from 4.2 towards 8 bar, following [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv). On its next pass the robot photographs gauge PI-104, the vision reading and the PLC transmitter agree, the rule fires, the robot walks to XV-104, closes it and the pressure falls back.
 
 Too slow for a first look? Run everything four times faster:
 
@@ -118,7 +118,7 @@ One hierarchy, `site/area/device/value`, named like the plant's P&ID (in Spanish
 Every message follows one contract. Only `value` is mandatory, extra fields are kept:
 
 ```json
-{"value": 6.8, "unit": "bar", "ts": "2026-11-18T15:28:54.920Z",
+{"value": 7.9, "unit": "bar", "ts": "2026-11-18T15:28:54.920Z",
  "source": "inspector", "quality": "good", "confidence": 0.94, "model": "qwen3-vl"}
 ```
 
