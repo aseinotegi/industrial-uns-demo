@@ -61,7 +61,8 @@ def main() -> int:
                 continue
             answers[hashlib.sha256(photo.read_bytes()).hexdigest()] = {"archivo": row["archivo"], **answer}
             reading = f"{answer['value']} {answer['unit'] or ''}"
-            summary = f"{reading} · {answer['confidence']} · caja {answer['bbox_2d']} · otras {answer['other_boxes']}"
+            boxes = f"caja {answer['bbox_2d']} · otras {answer['other_boxes']}"
+            summary = f"{reading} · {answer['confidence']} · {boxes}"
             print(f"{row['archivo']}: {summary}", file=sys.stderr)
     print(json.dumps(answers, ensure_ascii=False))
     return 0
