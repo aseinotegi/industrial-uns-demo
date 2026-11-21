@@ -73,8 +73,8 @@ El robot (`robot-01`) acelera y frena, va más despacio en las curvas, gasta bat
 ## El dataset
 
 - [dataset/plc/linea-104.csv](dataset/plc/linea-104.csv): la presión de entrada durante un ciclo. Caudal, nivel, bomba y temperatura salen de ella con física sencilla.
-- [dataset/fotos/](dataset/fotos) y [fotos.csv](dataset/fotos.csv): 10 fotos reales de Wikimedia Commons (CC BY, CC BY-SA, CC0), con su valor real leído a mano. Autores y licencias en [dataset/fotos/CREDITOS.md](dataset/fotos/CREDITOS.md) y junto a cada foto en la consola.
-  - **PI-104**, el manómetro que tiene que seguir a la línea, tiene dos: una a 5,3 bar y la misma foto retocada a 8 bar (marcada como tal). La cámara entrega la que está del mismo lado de la alarma de 6 bar que la esfera.
+- [dataset/fotos/](dataset/fotos) y [fotos.csv](dataset/fotos.csv): 10 fotos de Wikimedia Commons (CC BY, CC BY-SA, CC0), con su valor real leído a mano. Autores y licencias en [dataset/fotos/CREDITOS.md](dataset/fotos/CREDITOS.md) y junto a cada foto en la consola.
+  - **PI-104**, el manómetro que tiene que seguir a la línea, tiene dos: una a 5,3 bar y otra a 8 bar, con un manómetro pequeño al lado: se lee el grande y el pequeño se localiza aparte. La cámara entrega la que está del mismo lado de la alarma de 6 bar que la esfera.
 - [respuestas-de-prueba.json](dataset/respuestas-de-prueba.json): lo que contestó Gemini de cada foto, caja incluida, grabado con `python3 scripts/grabar-respuestas.py`. La ronda del robot lo reproduce, errores incluidos.
 
 Para añadir una foto: déjala en `dataset/fotos/`, añade su fila a `fotos.csv` y su crédito a `CREDITOS.md`, y graba su respuesta.

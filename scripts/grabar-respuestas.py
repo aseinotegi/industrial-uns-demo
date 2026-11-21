@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FIELDS = ("value", "unit", "status_reason", "confidence", "evidence", "bbox_2d")
+FIELDS = ("value", "unit", "status_reason", "confidence", "evidence", "bbox_2d", "other_boxes")
 
 
 def ask(photo: Path, poi: str) -> dict:
@@ -61,7 +61,7 @@ def main() -> int:
                 continue
             answers[hashlib.sha256(photo.read_bytes()).hexdigest()] = {"archivo": row["archivo"], **answer}
             reading = f"{answer['value']} {answer['unit'] or ''}"
-            summary = f"{reading} · {answer['confidence']} · caja {answer['bbox_2d']}"
+            summary = f"{reading} · {answer['confidence']} · caja {answer['bbox_2d']} · otras {answer['other_boxes']}"
             print(f"{row['archivo']}: {summary}", file=sys.stderr)
     print(json.dumps(answers, ensure_ascii=False))
     return 0
