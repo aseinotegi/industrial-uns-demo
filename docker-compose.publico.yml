@@ -1,0 +1,65 @@
+# The public demo (demo.andersein.com), on top of docker-compose.yml.
+#
+#   In .env (never in git):
+#     COMPOSE_FILE=docker-compose.yml:docker-compose.publico.yml
+#     TUNNEL_TOKEN=...              the Cloudflare tunnel's token
+#     GRAFANA_URL=https://demo-grafana.andersein.com
+#     GRAFANA_ADMIN_PASSWORD=...    random; nobody logs in, but it must not be the demo one
+#     DB_PASSWORD=..., GRAFANA_DB_PASSWORD=...
+#   then: docker compose up -d --build
+#
+# The tunnel routes demo.andersein.com to http://console:8000 and
+# demo-grafana.andersein.com to http://grafana:3000. It is an outbound connection: no
+# port is published on the host, so the console's CF-Connecting-IP can be trusted.
+#
+# What changes for a visitor from the internet:
+# * console in SHOWROOM mode: read-only rules, no probes, rationed disturbance and
+#   vision trials, no uploads, capped bodies, strict CSP (see plant-console's README).
+# * broker with acl.showroom: the console cannot propose rules, whatever it is told.
+# * Grafana: anonymous viewer only, no login form, no snapshots, no public dashboards,
+#   version hidden; its database user gives up any query after 5 s.
+# * the history keeps 7 days.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.11.1
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN missing in .env}
+    depends_on: [console, grafana]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    networks: [publica]
+
+  broker:
+    environment:
+      ACL_FILE: acl.showroom
+    ports: !reset []
+
+  console:
+    environment:
+      SHOWROOM: "true"
+      GRAFANA_URL: ${GRAFANA_URL:?GRAFANA_URL missing in .env}
+    ports: !reset []
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.2.5}
+    ports: !reset []
+    environment:
+      GF_SERVER_ROOT_URL: ${GRAFANA_URL}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD missing in .env}
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SNAPSHOTS_ENABLED: "false"
+      GF_PUBLIC_DASHBOARDS_ENABLED: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+
+  historian:
+    environment:
+      RETENTION_DAYS: "7"

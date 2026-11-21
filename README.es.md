@@ -152,7 +152,14 @@ La demo aplica lo básico de IEC 62443 a escala de portátil, y la página **Cib
 - **Histórico intocable.** Grafana lee con un usuario de base de datos que solo puede hacer `SELECT`.
 - **Expuesto:** solo la consola (8000) y Grafana (3000). El broker solo en `127.0.0.1:1883`, para [MQTT Explorer](https://mqtt-explorer.com) con el usuario de solo lectura `explorer` / `explorer`.
 
-Falta, para el servidor público: TLS, secretos fuera del repositorio (las contraseñas de aquí son de demo, en `config/mosquitto/passwords` y `docker-compose.yml`) y registros de auditoría centralizados. El CI comprueba el resto en cada push: acceso anónimo rechazado, una orden desde la consola descartada y Grafana sin poder borrar el histórico.
+**La demo pública** ([docker-compose.publico.yml](docker-compose.publico.yml)) corre en una Raspberry Pi 5 detrás de un Cloudflare Tunnel: una conexión saliente, TLS en Cloudflare, ningún puerto abierto en casa ni publicado en el host. Además de lo anterior:
+
+- la consola en modo **showroom**: reglas de solo lectura, sin pruebas, el botón de perturbación y los ensayos de visión racionados por visitante y en total, una foto del catálogo ya analizada se responde de memoria, sin subidas, cuerpos de petición limitados y una Content-Security-Policy estricta;
+- el broker con [acl.showroom](config/mosquitto/acl.showroom): la consola no puede proponer reglas ni aunque la tomaran;
+- Grafana anónimo y de solo lectura, sin formulario de login, snapshots ni dashboards públicos; su usuario de base de datos corta cualquier consulta a los 5 s, con 10 conexiones como mucho;
+- los secretos (token del túnel, contraseñas de la base de datos y de Grafana) solo en el `.env` de la Pi; el histórico guarda 7 días.
+
+Falta: registros de auditoría centralizados y secretos para los usuarios MQTT (el broker no es alcanzable desde fuera, pero sus contraseñas siguen siendo las de demo). El CI comprueba el resto en cada push: acceso anónimo rechazado, una orden desde la consola descartada y Grafana sin poder borrar el histórico.
 
 ## Decisiones de diseño
 

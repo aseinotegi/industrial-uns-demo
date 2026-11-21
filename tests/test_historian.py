@@ -135,6 +135,13 @@ def test_grafana_gets_a_user_that_can_only_read():
     assert "CREATE ROLE" in text and "s3cret" in text
     assert "GRANT SELECT ON measurements, events" in text
     assert "INSERT" not in text and "DELETE" not in text and "UPDATE" not in text
+    assert "statement_timeout = '5s'" in text and "CONNECTION LIMIT 10" in text  # no query hogs it
+
+
+def test_old_history_is_dropped_by_a_retention_policy():
+    cur = Recorder()
+    Historian._retention(cur, 7)
+    assert sum("add_retention_policy" in s for s in cur.sql) == 2
 
 
 def test_an_existing_reader_gets_its_password_updated_not_recreated():

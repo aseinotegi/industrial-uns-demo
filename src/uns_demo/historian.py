@@ -80,7 +80,7 @@ class Historian:
         self._lock = threading.Lock()
         self._conn = None
 
-    def setup(self, reader_password: str | None = None) -> None:
+    def setup(self, reader_password: str | None = None, retention_days: int = 0) -> None:
         conn = self._connection()
         with conn.cursor() as cur:
             for statement in SCHEMA:
@@ -91,6 +91,8 @@ class Historian:
                 for statement in HYPERTABLES:
                     cur.execute(statement)
                 log.info("TimescaleDB hypertables ready")
+                if retention_days > 0:
+                    self._retention(cur, retention_days)
             else:
                 log.info("plain PostgreSQL (no TimescaleDB): regular tables")
             if reader_password:
@@ -110,7 +112,20 @@ class Historian:
         cur.execute(sql.SQL("GRANT SELECT ON measurements, events TO {}").format(name))
         future = "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}"
         cur.execute(sql.SQL(future).format(name))
+        # Grafana may be open to anyone: no query runs for long, and few at once.
+        cur.execute(sql.SQL("ALTER ROLE {} CONNECTION LIMIT 10").format(name))
+        cur.execute(sql.SQL("ALTER ROLE {} SET statement_timeout = '5s'").format(name))
         log.info("read-only database user '%s' ready", role)
+
+    @staticmethod
+    def _retention(cur, days: int) -> None:
+        """Older rows are dropped by TimescaleDB itself, a chunk at a time."""
+        policy = (
+            "SELECT add_retention_policy(%s::regclass, make_interval(days => %s::int), if_not_exists => TRUE)"
+        )
+        for table in ("measurements", "events"):
+            cur.execute(policy, (table, days))
+        log.info("history kept for %d days", days)
 
     def ping(self) -> bool:
         try:
@@ -188,7 +203,7 @@ def main() -> int:
     stop = stop_on_signal()
     while True:  # the database may still be starting
         try:
-            historian.setup(os.environ.get("GRAFANA_DB_PASSWORD"))
+            historian.setup(os.environ.get("GRAFANA_DB_PASSWORD"), int(os.environ.get("RETENTION_DAYS", "0")))
             break
         except psycopg.OperationalError as exc:
             log.info("waiting for the database: %s", str(exc).splitlines()[0])

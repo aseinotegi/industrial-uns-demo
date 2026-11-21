@@ -12,4 +12,6 @@ datasources:
       sslmode: disable
       timescaledb: true
       postgresVersion: 1600
+      maxOpenConns: 5  # the role allows 10 and each query 5 s: Grafana cannot hog the database
+      maxIdleConns: 2
     isDefault: true

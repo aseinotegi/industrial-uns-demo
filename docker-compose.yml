@@ -46,7 +46,7 @@ services:
     command:
       - >-
         tr -d '\r' < /mosquitto/config/passwords > /tmp/mosquitto-passwd &&
-        tr -d '\r' < /mosquitto/config/acl > /tmp/mosquitto-acl &&
+        tr -d '\r' < /mosquitto/config/$${ACL_FILE:-acl} > /tmp/mosquitto-acl &&
         chmod 0700 /tmp/mosquitto-passwd /tmp/mosquitto-acl &&
         mosquitto_passwd -U /tmp/mosquitto-passwd &&
         exec mosquitto -c /mosquitto/config/mosquitto.conf
@@ -166,6 +166,7 @@ services:
       MQTT_PASSWORD: demo-historian
       DATABASE_URL: postgresql://uns:${DB_PASSWORD:-demo-uns}@timescaledb:5432/uns
       GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-demo-grafana}  # it creates Grafana's read-only user
+      RETENTION_DAYS: ${RETENTION_DAYS:-0}  # 0: keep everything
     networks: [uns, datos]
 
   timescaledb:

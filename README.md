@@ -152,7 +152,14 @@ The demo applies the basics of IEC 62443 at laptop scale, and the console's **Ci
 - **Untouchable history.** Grafana reads with a database user that can only `SELECT`.
 - **Exposed:** only the console (8000) and Grafana (3000). The broker only on `127.0.0.1:1883`, for [MQTT Explorer](https://mqtt-explorer.com) with the read-only user `explorer` / `explorer`.
 
-Not done yet, for the public server: TLS, secrets out of the repository (the passwords here are demo ones, in `config/mosquitto/passwords` and `docker-compose.yml`) and centralised audit logs. The CI checks the rest on every push: anonymous access refused, an order from the console dropped, Grafana unable to delete history.
+**The public demo** ([docker-compose.publico.yml](docker-compose.publico.yml)) runs on a Raspberry Pi 5 behind a Cloudflare Tunnel: an outbound connection, TLS at Cloudflare, no port open at home and none published on the host. On top of the above:
+
+- the console in **showroom** mode: read-only rules, no probes, the disturbance button and the vision trials rationed per visitor and overall, a catalog photo answered from memory once analyzed, no uploads, capped request bodies and a strict Content-Security-Policy;
+- the broker with [acl.showroom](config/mosquitto/acl.showroom): the console cannot propose rules even if it were taken over;
+- Grafana anonymous and read-only, without login form, snapshots or public dashboards; its database user gives up any query after 5 s, with at most 10 connections;
+- secrets (tunnel token, database and Grafana passwords) only in the Pi's `.env`; the history keeps 7 days.
+
+Not done yet: centralised audit logs, and secrets for the MQTT users (the broker is not reachable from outside, but its passwords are still the demo ones). The CI checks the rest on every push: anonymous access refused, an order from the console dropped, Grafana unable to delete history.
 
 ## Design decisions
 
