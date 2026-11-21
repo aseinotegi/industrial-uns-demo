@@ -1,121 +1,177 @@
 {
- "_nota": "Respuestas que dio gemini-3.5-flash-lite el 21-nov-2026 sobre las fotos reales, con su caja, grabadas con scripts/grabar-respuestas.py; tal cual, aciertos y errores. Las de PI-104 (pi-104_5.3 y pi-104_8.0) son provisionales, escritas desde su valor, hasta grabarlas igual.",
- "a8c9e7280230ce3799c1bd2f7915b862e47b20a5e59220f12233655dd96ca1cb": {
-  "value": 11.0,
+ "_nota": "Respuestas que dio gemini-3.5-flash-lite el 21-nov-2026 sobre las fotos del dataset, con la caja del objeto inspeccionado y las de los otros del mismo tipo, grabadas con scripts/grabar-respuestas.py; tal cual, aciertos y errores.",
+ "b863659a9e32c9cf0370935b8a59dfccfc195b6e0eb0f8fff461d9600e891754": {
+  "value": 5.4,
   "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle points exactly at the 11 bar mark on the dial.",
+  "evidence": "The needle of the main pressure gauge on the right points at approximately 5.4 bar on the outer scale.",
   "bbox_2d": [
-   39,
-   41,
-   665,
-   618
+   428,
+   301,
+   880,
+   917
+  ],
+  "other_boxes": [
+   [
+    161,
+    381,
+    456,
+    789
+   ]
   ]
  },
- "5989559ef6863b36ed494b53182620c121ce607a5d5cc69eee88fdf22d0b2c44": {
+ "46b01f75271b83afe91fca38db7ddf6fc74ea6598a8d892d9a698328e4eda51e": {
+  "value": 7.4,
+  "unit": "Bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.95,
+  "evidence": "The needle of the main pressure gauge on the right points to 7.4 Bar.",
+  "bbox_2d": [
+   437,
+   305,
+   882,
+   918
+  ],
+  "other_boxes": [
+   [
+    164,
+    377,
+    461,
+    788
+   ]
+  ]
+ },
+ "a8c9e7280230ce3799c1bd2f7915b862e47b20a5e59220f12233655dd96ca1cb": {
   "value": 1.7,
   "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The upper red needle on the bar scale points just below the 2 mark, at approximately 1.7 bar.",
+  "evidence": "The needle points slightly below the 2 mark, at approximately 1.7 bar.",
   "bbox_2d": [
-   253,
-   342,
-   732,
-   668
-  ]
+   40,
+   63,
+   619,
+   666
+  ],
+  "other_boxes": []
+ },
+ "5989559ef6863b36ed494b53182620c121ce607a5d5cc69eee88fdf22d0b2c44": {
+  "value": 1.5,
+  "unit": "bar",
+  "status_reason": "lectura_valida",
+  "confidence": 0.95,
+  "evidence": "The pressure needle points to approximately 1.5 bar on the upper scale.",
+  "bbox_2d": [
+   258,
+   345,
+   729,
+   664
+  ],
+  "other_boxes": []
  },
  "1a50b2bcb3381ac0ed689bf602630086d6d03d64ebb7c039f45911b5345daea8": {
-  "value": -10.0,
+  "value": 0,
   "unit": "kPa",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle points to approximately -10 kPa on the upper vacuum/pressure gauge.",
+  "evidence": "The needle of the top pressure gauge points to 0 kPa.",
   "bbox_2d": [
    327,
-   109,
-   711,
+   107,
+   709,
    323
+  ],
+  "other_boxes": [
+   [
+    197,
+    401,
+    608,
+    646
+   ],
+   [
+    703,
+    289,
+    987,
+    438
+   ]
   ]
  },
  "228e4321b85a29c7ef6ad86cc7950a638d84cf9ba3a0d4b26c82ecad01416dda": {
   "value": null,
   "unit": null,
   "status_reason": "no_legible",
-  "confidence": 0.3,
-  "evidence": "The pressure gauge is heavily weathered, scratched, and rusted, making the scale and exact needle position illegible.",
+  "confidence": 0.85,
+  "evidence": "The pressure gauge is extremely dirty, rusty, and covered in grime, making the scale and numbers unreadable.",
   "bbox_2d": [
-   214,
-   213,
-   687,
-   807
-  ]
+   211,
+   215,
+   804,
+   692
+  ],
+  "other_boxes": []
  },
  "8c227a2f81f0968efb3dbf7847798cb79ffb8a75d9f3725ff7ed7a22bb21e575": {
   "value": "OK",
   "unit": null,
   "status_reason": "correcto",
-  "confidence": 0.99,
-  "evidence": "The fire extinguisher is properly mounted on its wall bracket and looks complete.",
+  "confidence": 0.98,
+  "evidence": "The fire extinguisher hangs securely on its wall bracket and appears complete.",
   "bbox_2d": [
+   230,
    18,
-   18,
-   620,
-   996
-  ]
+   619,
+   836
+  ],
+  "other_boxes": []
  },
  "8135700f25c77798df325af8784844dfb722e374252f5fb7aec2d94dfc9e7292": {
   "value": "NOK",
   "unit": null,
   "status_reason": "fuera_de_soporte",
   "confidence": 0.99,
-  "evidence": "El extintor se encuentra tirado en el suelo en lugar de colgar en su soporte.",
+  "evidence": "The fire extinguisher is lying on the floor instead of hanging on its wall bracket.",
   "bbox_2d": [
-   262,
    287,
-   866,
-   583
-  ]
+   266,
+   582,
+   866
+  ],
+  "other_boxes": []
  },
  "304be58e33422b45de837abc0d9b84b68789cd9808b08034b50e9fbeca111869": {
   "value": "OK",
   "unit": null,
   "status_reason": "correcto",
-  "confidence": 0.98,
-  "evidence": "The fire extinguisher hangs properly on its wall bracket.",
+  "confidence": 0.95,
+  "evidence": "The fire extinguisher is properly mounted on its wall bracket and appears complete.",
   "bbox_2d": [
-   308,
    307,
-   654,
-   497
-  ]
+   419,
+   490,
+   654
+  ],
+  "other_boxes": []
  },
  "1de37c68a7581de1cdc708c8c8d2a017bad38b5a9468639a863cbf402b96a16a": {
   "value": "NOK",
   "unit": null,
   "status_reason": "fuera_de_soporte",
   "confidence": 0.99,
-  "evidence": "Two fire extinguishers are lying loose on the floor instead of being mounted on their wall bracket.",
+  "evidence": "The fire extinguisher is lying on the floor instead of hanging on its bracket.",
   "bbox_2d": [
    220,
-   351,
-   728,
-   799
+   372,
+   463,
+   798
+  ],
+  "other_boxes": [
+   [
+    463,
+    350,
+    728,
+    764
+   ]
   ]
- },
- "b863659a9e32c9cf0370935b8a59dfccfc195b6e0eb0f8fff461d9600e891754": {
-  "value": 5.3,
-  "unit": "bar",
-  "status_reason": "lectura_valida",
-  "confidence": 0.9,
-  "evidence": "needle at about 5.3 bar"
- },
- "46b01f75271b83afe91fca38db7ddf6fc74ea6598a8d892d9a698328e4eda51e": {
-  "value": 8.0,
-  "unit": "bar",
-  "status_reason": "lectura_valida",
-  "confidence": 0.9,
-  "evidence": "needle at about 8.0 bar"
  }
 }
