@@ -167,6 +167,8 @@ def test_every_recorded_answer_fits_its_question_and_locates_the_object():
         kind = config["profiles"][config["pois"][photo.poi]["profile"]]["kind"]
         assert set(answer) <= (common | {"unit"} if kind == "numeric" else common), photo.file
         assert answer["bbox_2d"], photo.file
+        expected = None if photo.value == "" else photo.value if kind == "state" else float(photo.value)
+        assert answer["value"] == expected, photo.file  # the round shows the true reading
 
 
 def test_the_gauge_photo_is_on_the_same_side_of_the_alarm_as_the_dial():

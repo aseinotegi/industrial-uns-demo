@@ -1,11 +1,11 @@
 {
- "_nota": "Respuestas que dio gemini-3.5-flash-lite el 21-nov-2026 sobre las fotos del dataset, con la caja del objeto inspeccionado y las de los otros del mismo tipo, grabadas con scripts/grabar-respuestas.py; tal cual, aciertos y errores.",
+ "_nota": "Respuestas de referencia que reproduce la ronda del robot (model: replay). Cajas de gemini-3.5-flash-lite, comprobadas dibujándolas sobre cada foto; valores revisados a mano contra la esfera, porque Flash-Lite falló varias lecturas. Las fotos que suben los visitantes las lee Gemini en directo.",
  "b863659a9e32c9cf0370935b8a59dfccfc195b6e0eb0f8fff461d9600e891754": {
-  "value": 5.4,
+  "value": 5.3,
   "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle of the main pressure gauge on the right points at approximately 5.4 bar on the outer scale.",
+  "evidence": "The needle of the large gauge on the right sits a little below 6, at about 5.3 bar; the small gauge on its left is another instrument.",
   "bbox_2d": [
    428,
    301,
@@ -22,11 +22,11 @@
   ]
  },
  "46b01f75271b83afe91fca38db7ddf6fc74ea6598a8d892d9a698328e4eda51e": {
-  "value": 7.4,
-  "unit": "Bar",
+  "value": 8.0,
+  "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle of the main pressure gauge on the right points to 7.4 Bar.",
+  "evidence": "The needle of the large gauge on the right points at the 8 mark, at the start of the red band: 8.0 bar.",
   "bbox_2d": [
    437,
    305,
@@ -43,11 +43,11 @@
   ]
  },
  "a8c9e7280230ce3799c1bd2f7915b862e47b20a5e59220f12233655dd96ca1cb": {
-  "value": 1.7,
+  "value": 21.0,
   "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle points slightly below the 2 mark, at approximately 1.7 bar.",
+  "evidence": "On the 0 to 25 bar dial the needle has just passed the 20 mark, at about 21 bar.",
   "bbox_2d": [
    40,
    63,
@@ -57,11 +57,11 @@
   "other_boxes": []
  },
  "5989559ef6863b36ed494b53182620c121ce607a5d5cc69eee88fdf22d0b2c44": {
-  "value": 1.5,
+  "value": 1.7,
   "unit": "bar",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The pressure needle points to approximately 1.5 bar on the upper scale.",
+  "evidence": "The red needle of the upper bar scale is between 1 and 2, closer to 2: about 1.7 bar.",
   "bbox_2d": [
    258,
    345,
@@ -71,11 +71,11 @@
   "other_boxes": []
  },
  "1a50b2bcb3381ac0ed689bf602630086d6d03d64ebb7c039f45911b5345daea8": {
-  "value": 0,
+  "value": -20,
   "unit": "kPa",
   "status_reason": "lectura_valida",
   "confidence": 0.95,
-  "evidence": "The needle of the top pressure gauge points to 0 kPa.",
+  "evidence": "On the upper vacuum/pressure gauge the needle points at the -20 kPa mark, left of zero.",
   "bbox_2d": [
    327,
    107,
